@@ -8,7 +8,7 @@ from google import genai
 import yfinance as yf
 import config
 
-ai_client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+ai_client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"].strip())
 
 @st.cache_resource
 def init_sheets():
@@ -18,7 +18,6 @@ def init_sheets():
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
 def get_live_gold():
-    # جلب سعر الذهب الفوري عبر Yahoo Finance (مضمون 100% من خوادم السحابة)
     ticker = yf.Ticker("GC=F")
     hist = ticker.history(period="2d")
     
@@ -31,13 +30,25 @@ def get_live_gold():
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
     return ounce, ch, chp, buy_24k, sell_24k
 
+def _call_gemini_safe(prompt):
+    # تجربة النماذج المتاحة بالترتيب لضمان عدم توقف الخدمة أبداً
+    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    last_error = ""
+    for model_name in models_to_try:
+        try:
+            res = ai_client.models.generate_content(model=model_name, contents=prompt)
+            return res.text
+        except Exception as e:
+            last_error = str(e)
+            continue
+    return f"⚠️ تعذر الاتصال بالذكاء الاصطناعي حالياً. السبب التقني: {last_error}"
+
 def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
     prompt = f"""أنت حاسبة ذكية ومستشار مالي لمحفظة ذهب (دار السبائك - الكويت). أجب باختصار شديد وبالعربية:
 - سعر الشراء 24: {buy_24k} د.ك | سعر البيع 24: {sell_24k} د.ك | الأونصة: {ounce}$
 - بيانات المحفظة: {portfolio_rows}
 - سؤال المستخدم: {user_question}"""
-    res = ai_client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-    return res.text
+    return _call_gemini_safe(prompt)
 
 def generate_and_send_report(sheet_dashboard, send_notifications=False):
     ounce, ch, chp, buy_24k, sell_24k = get_live_gold()
@@ -55,10 +66,9 @@ def generate_and_send_report(sheet_dashboard, send_notifications=False):
     now_kw = datetime.now(config.KUWAIT_TZ).strftime("%A, %Y-%m-%d %H:%M")
     prompt = config.build_report_prompt(now_kw, ounce, ch, chp, buy_24k, portfolio_text, targets_text, news_text)
 
-    res = ai_client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-    report_text = res.text
+    report_text = _call_gemini_safe(prompt)
 
-    if send_notifications:
+    if send_notifications and not report_text.startswith("⚠️"):
         tg_token = st.secrets.get("TELEGRAM_TOKEN", "")
         if tg_token:
             tg_url = f"https://telegram.org{tg_token}/sendMessage"
