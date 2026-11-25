@@ -16,6 +16,27 @@ NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "semsem_gold_kw_99").strip()
 
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
+def call_gemini_safe(prompt):
+    # استخدام أحدث نموذج معتمد + جلب النماذج المتاحة تلقائياً من حسابك
+    models_to_try = ["gemini-3.8-flash", "gemini-3-flash-preview", "gemini-2.5-flash"]
+    try:
+        for m in ai_client.models.list():
+            name = m.name.replace("models/", "")
+            if "flash" in name and name not in models_to_try:
+                models_to_try.append(name)
+    except Exception:
+        pass
+
+    last_err = ""
+    for model_name in models_to_try:
+        try:
+            res = ai_client.models.generate_content(model=model_name, contents=prompt)
+            return res.text
+        except Exception as e:
+            last_err = str(e)
+            continue
+    raise RuntimeError(f"All Gemini models failed. Last error: {last_err}")
+
 def send_all_channels(title, html_message, is_urgent=False):
     if TELEGRAM_TOKEN:
         tg_url = f"https://telegram.org{TELEGRAM_TOKEN}/sendMessage"
@@ -118,8 +139,8 @@ def run_quarter_hourly_monitor():
 
 اكتب تنبيهاً عاجلاً ومختصراً جداً (4 أسطر فقط) بتنسيق HTML لتيليجرام (استخدم <b> فقط ويُمنع Markdown) يوضح القرار المناسب الآن (شراء/تعزيز أم انتظار)."""
 
-        res = ai_client.models.generate_content(model="gemini-2.5-flash", contents=alert_prompt)
-        full_alert = f"{alert_header}\n\n{res.text}"
+        alert_reply = call_gemini_safe(alert_prompt)
+        full_alert = f"{alert_header}\n\n{alert_reply}"
         send_all_channels(f"إنذار ذهب عاجل: {buy_24k} د.ك", full_alert, is_urgent=True)
 
     report_hours = (10, 14, 18, 22)
@@ -128,8 +149,8 @@ def run_quarter_hourly_monitor():
         feed = feedparser.parse(config.RSS_NEWS_URL)
         news_text = "\n".join([entry.title for entry in feed.entries[:7]])
         prompt = config.build_report_prompt(now_kw, ounce, ch_day, chp_day, buy_24k, portfolio_text, targets_text, news_text)
-        res = ai_client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-        send_all_channels(f"تقرير دار السبائك: {buy_24k} د.ك", res.text, is_urgent=False)
+        report_reply = call_gemini_safe(prompt)
+        send_all_channels(f"تقرير دار السبائك: {buy_24k} د.ك", report_reply, is_urgent=False)
 
     print(f"Checked at {now_kw} | Ounce: {ounce}$ | 15m Diff: {diff_15m}$ | 1h Diff: {diff_1h}$")
 
