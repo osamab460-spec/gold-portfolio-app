@@ -48,16 +48,19 @@ st.divider()
 tab1, tab2, tab3, tab4 = st.tabs(["📊 المحفظة", "➕ صفقة جديدة", "🤖 المستشار AI", "📜 السجل"])
 
 with tab1:
-    rows = sheet_dashboard.get("A15:I15")
-    row = rows if rows else ["0"] * 9
-    
+    # قراءة كل خلية مباشرة لضمان دقة العرض 100%
+    gold_balance = sheet_dashboard.acell("A15").value or "0"
+    total_cost = sheet_dashboard.acell("B15").value or "0"
+    market_val = sheet_dashboard.acell("C15").value or "0"
+    avg_cost = sheet_dashboard.acell("D15").value or "0"
+
     c1, c2 = st.columns(2)
-    c1.metric("رصيد الذهب", f"{row if len(row)>0 else '0'} جم")
-    c2.metric("متوسط التكلفة", f"{row if len(row)>3 else '0'} د.ك")
+    c1.metric("رصيد الذهب", f"{gold_balance} جم")
+    c2.metric("متوسط التكلفة", f"{avg_cost} د.ك")
 
     c3, c4 = st.columns(2)
-    c3.metric("إجمالي التكلفة", f"{row if len(row)>1 else '0'} د.ك")
-    c4.metric("القيمة السوقية", f"{row if len(row)>2 else '0'}")
+    c3.metric("إجمالي التكلفة", f"{total_cost} د.ك")
+    c4.metric("القيمة السوقية", f"{market_val}")
 
     if st.button("🔄 تحديث البيانات والأسعار"):
         st.rerun()
@@ -92,10 +95,10 @@ with tab3:
 
 with tab4:
     all_rows = sheet_log.get_all_values()
-    last_5 = all_rows[-5:][::-1]
+    last_5 = list(reversed(all_rows))[:5]
     for r in last_5:
-        if len(r) >= 4:
-            st.write(f"• **{r}** | {r}: {r} جم بسعر {r} د.ك")
+        if len(r) >= 4 and r != "التاريخ":
+            st.write(" • ".join(r[:4]))
 
     st.divider()
     if st.button("🗑️ حذف آخر صفقة مسجلة"):
