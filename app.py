@@ -10,24 +10,18 @@ st.markdown("""
 <style>
     header[data-testid="stHeader"], footer { display: none !important; }
     .block-container { padding-top: 0.8rem !important; padding-bottom: 2rem !important; max-width: 680px; }
-
-    /* تطبيق الاتجاه العربي على النصوص والبطاقات فقط دون كسر إزاحة التبويبات */
     p, h1, h2, h3, h4, h5, label, .rtl-box { direction: rtl; text-align: right; }
-
     .trade-box-sell { background-color: #FFF2F4; border: 1px solid #FAD1D8; border-radius: 10px; padding: 10px; text-align: center; }
     .trade-box-buy { background-color: #EBF9F4; border: 1px solid #C2EEDF; border-radius: 10px; padding: 10px; text-align: center; }
     .sell-label { color: #F6465D; font-size: 0.8rem; font-weight: 800; }
     .sell-price { color: #F6465D; font-size: 1.25rem; font-weight: 800; }
     .buy-label { color: #00B87A; font-size: 0.8rem; font-weight: 800; }
     .buy-price { color: #00B87A; font-size: 1.25rem; font-weight: 800; }
-
     .light-card { background-color: #F8F9FA; border: 1px solid #EAECEF; border-radius: 12px; padding: 10px 12px; text-align: center; margin-bottom: 8px; }
     .light-title { color: #707A8A; font-size: 0.74rem; margin-bottom: 2px; font-weight: 600; }
     .light-val { color: #1E2329; font-size: 1.15rem; font-weight: 800; }
     .gold-badge { background-color: #FEF6D8; color: #C99400; padding: 3px 10px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; }
-
     .ohlc-bar { background-color: #F8F9FA; border: 1px solid #EAECEF; border-radius: 8px; padding: 6px 10px; font-size: 0.75rem; color: #474D57; display: flex; justify-content: space-between; margin-bottom: 6px; direction: ltr; }
-
     .stButton>button { width: 100%; border-radius: 10px; height: 3em; font-weight: 700; background-color: #FCD535 !important; color: #1E2329 !important; border: none !important; }
     button[data-baseweb="tab"] { font-size: 0.85rem !important; font-weight: 700 !important; }
 </style>
@@ -55,7 +49,6 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-# ================= شريط الترويسة وبطاقتي البيع والشراء =================
 try:
     ounce, ch, chp, buy_24k, sell_24k = services.get_live_gold()
     if ounce > 0:
@@ -221,3 +214,5 @@ with tab2:
     st.markdown("#### 🎯 أفضل 3 مناطق شراء مقترحة")
     st.caption("تحليل فني + الأخبار الحية لتحديد نقاط تعزيز محفظتك.")
     if st.button("🔍 استخرج مناطق القنص الآن"):
+        with st.spinner("جاري تحليل الشارت والأخبار..."):
+            zones = services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams)
