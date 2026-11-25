@@ -21,13 +21,11 @@ st.markdown("""
 
 sheet_dashboard, sheet_log = services.init_sheets()
 
-# ================= التحقق من رابط الجدولة التلقائية =================
 if st.query_params.get("cron") == "run":
     services.generate_and_send_report(sheet_dashboard, send_notifications=True)
     st.success("CRON_OK")
     st.stop()
 
-# ================= 1. شاشة قفل الحماية برقم سري (PIN) =================
 APP_PIN = st.secrets.get("APP_PIN", "1234")
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -43,7 +41,6 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-# ================= 2. شريط الأسعار الحية ورادار البيانات الاقتصادية =================
 st.title("🪙 محفظة دار السبائك AI Pro")
 
 try:
@@ -59,7 +56,6 @@ except Exception as e:
     ounce, buy_24k, sell_24k = 0, 0, 0
     st.warning(f"تنبيه السعر الحي: {e}")
 
-# رادار البيانات الاقتصادية (Volatility Shield)
 try:
     eco_alerts = services.get_economic_radar()
     if eco_alerts:
@@ -72,7 +68,6 @@ except Exception:
 
 st.divider()
 
-# قراءة بيانات المحفظة الأساسية
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 market_val_str = sheet_dashboard.acell("C15").value or "0"
@@ -84,7 +79,6 @@ try:
 except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
-# ================= 3. تبويبات التطبيق =================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 المحفظة والشارت",
     "🎯 مناطق الشراء",
@@ -93,7 +87,6 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📜 السجل"
 ])
 
-# --- التبويب 1: موقف المحفظة والشارت الاحترافي (Candlesticks + Bollinger + صفقاتك) ---
 with tab1:
     c1, c2 = st.columns(2)
     c1.metric("رصيد الذهب", f"{gold_balance_str} جم")
@@ -108,7 +101,6 @@ with tab1:
         df_chart, _ = services.get_pro_chart_data()
         fig = go.Figure()
 
-        # الشموع اليابانية
         fig.add_trace(go.Candlestick(
             x=df_chart.index,
             open=df_chart["Open"],
@@ -118,7 +110,6 @@ with tab1:
             name="سعر الجرام (د.ك)"
         ))
 
-        # البولينجر باند (حدود التشبع البيعي والشرائي)
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=df_chart["LowerBB"],
             line=dict(color="rgba(0, 200, 100, 0.5)", width=1, dash="dot"),
@@ -130,7 +121,6 @@ with tab1:
             name="منطقة تشبع شرائي (مقاومة)"
         ))
 
-        # خط متوسط تكلفتك الحالي (نقطة التعادل)
         if curr_avg > 0:
             fig.add_hline(
                 y=curr_avg,
@@ -140,7 +130,6 @@ with tab1:
                 annotation_position="top left"
             )
 
-        # رسم نقاط صفقات الشراء المسجلة في الإكسل على الشارت بدون استخدام أقواس مربعة
         log_rows = sheet_log.get_all_values()
         buy_dates, buy_prices = [], []
         chart_start = df_chart.index.min().strftime("%Y-%m-%d")
@@ -178,7 +167,6 @@ with tab1:
     if st.button("🔄 تحديث البيانات والأسعار"):
         st.rerun()
 
-# --- التبويب 2: مقترح أفضل مناطق الشراء والمستشار AI ---
 with tab2:
     st.subheader("🎯 اقتراح أفضل أسعار الشراء (تحليل فني + أساسي)")
     st.caption("يحلل المؤشرات الفنية لـ 30 يوماً والأخبار الحية ليقترح 3 دفعات شراء لتخفيض متوسطك.")
@@ -204,7 +192,6 @@ with tab2:
             rep = services.generate_and_send_report(sheet_dashboard, send_notifications=True)
             st.markdown(rep, unsafe_allow_html=True)
 
-# --- التبويب 3: حاسبة تعديل المتوسط + الزكاة ---
 with tab3:
     st.subheader("🧮 محاكي تعديل المتوسط (ماذا لو اشتريت؟)")
     sim_grams = st.slider("الكمية المقترحة للشراء (بالجرام)", min_value=1, max_value=200, value=20, step=1)
@@ -234,7 +221,6 @@ with tab3:
     else:
         st.success(f"رصيدك ({curr_grams} جم) لم يبلغ النصاب الشرعي (85 جم) بعد.")
 
-# --- التبويب 4: تسجيل صفقة جديدة ---
 with tab4:
     st.subheader("تسجيل صفقة في دار السبائك")
     op_type = st.radio("نوع العملية", ["شراء", "بيع"], horizontal=True)
@@ -247,9 +233,18 @@ with tab4:
         sheet_log.append_row([today_str, op_type, final_price, grams], value_input_option="USER_ENTERED")
         st.success(f"تم تسجيل {op_type} {grams} جم بسعر {final_price} د.ك بنجاح!")
 
-# --- التبويب 5: سجل العمليات والحذف ---
 with tab5:
     all_rows = sheet_log.get_all_values()
     last_5 = list(reversed(all_rows))[:5]
     for r in last_5:
-        if len(r) >= 4 and "التاريخ" not in str(r):
+        if len(r) >= 4:
+            row_text = " • ".join(r[:4])
+            if "التاريخ" not in row_text:
+                st.write(row_text)
+
+    st.divider()
+    if st.button("🗑️ حذف آخر صفقة مسجلة"):
+        if len(all_rows) > 1:
+            sheet_log.delete_rows(len(all_rows))
+            st.warning("تم حذف آخر صفقة وتحديث الرصيد!")
+            st.rerun()
