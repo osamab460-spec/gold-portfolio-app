@@ -26,4 +26,8 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+
         run: python cron_worker.py
+
+        
