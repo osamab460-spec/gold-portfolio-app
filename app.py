@@ -111,6 +111,19 @@ with tab1:
         fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart["UpperBB"], line=dict(color="rgba(100,181,246,0.25)", width=1), showlegend=False), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart["LowerBB"], line=dict(color="rgba(100,181,246,0.35)", width=1), fill="tonexty", fillcolor="rgba(100,181,246,0.06)", name="بولينجر"), row=1, col=1)
 
+        # رسم علامات الماس الذهبية تحت شمعات المطرقة المكتشفة تلقائياً
+        hammers = df_chart[df_chart["Hammer"] == True]
+        if not hammers.empty:
+            fig.add_trace(go.Scatter(
+                x=hammers.index,
+                y=hammers["Low"] - 0.12,
+                mode="markers+text",
+                text="🔨",
+                textposition="bottom center",
+                marker=dict(symbol="diamond", size=9, color="#FFD54F", line=dict(width=1, color="#00E676")),
+                name="مطرقة"
+            ), row=1, col=1)
+
         if curr_avg > 0:
             fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FF5252", line_width=1.5, annotation_text=f"متوسطك {curr_avg:.3f}", annotation_font_color="#FF8A80", annotation_position="top left", row=1, col=1)
 
@@ -140,7 +153,7 @@ with tab1:
         fig.add_hline(y=70, line_dash="dot", line_color="rgba(255,82,82,0.5)", row=2, col=1)
         fig.add_hline(y=30, line_dash="dot", line_color="rgba(0,230,118,0.5)", row=2, col=1)
 
-        fig.update_layout(template="plotly_dark", paper_bgcolor="#141821", plot_bgcolor="#141821", xaxis_rangeslider_visible=False, dragmode=False, height=430, margin=dict(l=8, r=8, t=35, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5, font=dict(size=10, color="#E0E6ED")))
+        fig.update_layout(template="plotly_dark", paper_bgcolor="#141821", plot_bgcolor="#141821", xaxis_rangeslider_visible=False, dragmode=False, height=440, margin=dict(l=8, r=8, t=35, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5, font=dict(size=10, color="#E0E6ED")))
         fig.update_xaxes(showgrid=True, gridcolor="#1F2636")
         fig.update_yaxes(showgrid=True, gridcolor="#1F2636", side="right", row=1, col=1)
         fig.update_yaxes(showgrid=True, gridcolor="#1F2636", side="right", range=(0, 100), tickvals=(30, 70), row=2, col=1)
@@ -168,14 +181,3 @@ with tab2:
             with st.spinner("جاري الحساب..."):
                 portfolio_rows = sheet_dashboard.get("A13:I16")
                 answer = services.ask_ai_advisor(user_q, ounce, buy_24k, sell_24k, portfolio_rows)
-                st.success(answer)
-
-    st.divider()
-    if st.button("📢 إرسال التقرير الشامل لتيليجرام وواتساب"):
-        with st.spinner("جاري الإرسال..."):
-            rep = services.generate_and_send_report(sheet_dashboard, send_notifications=True)
-            st.markdown(rep, unsafe_allow_html=True)
-
-with tab3:
-    st.markdown("#### 🧮 محاكي تعديل المتوسط")
-    sim_grams = st.slider("الكمية الإضافية (جرام)", min_value=1, max_value=200, value=20, step=1)
