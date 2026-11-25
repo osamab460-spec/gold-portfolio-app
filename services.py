@@ -6,6 +6,7 @@ import streamlit as st
 import gspread
 from google import genai
 import yfinance as yf
+import pandas as pd
 import config
 
 ai_client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"].strip())
@@ -30,10 +31,30 @@ def get_live_gold():
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
     return ounce, ch, chp, buy_24k, sell_24k
 
-def _call_gemini_safe(prompt):
-    # النماذج الحديثة المعتمدة + جلب المتاح تلقائياً من حسابك
-    models_to_try = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"]
+def get_chart_and_technicals():
+    ticker = yf.Ticker("GC=F")
+    hist = ticker.history(period="1mo")
     
+    # حساب السعر الكويتي لكل يوم للرسم البياني
+    df = pd.DataFrame()
+    df["سعر جرام 24 (د.ك)"] = ((hist["Close"] / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR).round(3)
+    
+    # حساب المؤشرات الفنية (أعلى، أدنى، متوسط متحرك، RSI)
+    high_30d = round(float(hist["High"].max()), 2)
+    low_30d = round(float(hist["Low"].min()), 2)
+    sma_20 = round(float(hist["Close"].tail(20).mean()), 2)
+    
+    delta = hist["Close"].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    rsi = round(float(100 - (100 / (1 + rs.iloc[-1]))), 1)
+    
+    tech_summary = f"أعلى سعر 30 يوم: {high_30d}$ | أدنى سعر 30 يوم: {low_30d}$ | المتوسط المتحرك 20 يوم: {sma_20}$ | مؤشر القوة النسبية (RSI 14): {rsi}"
+    return df, tech_summary
+
+def _call_gemini_safe(prompt):
+    models_to_try = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"]
     try:
         for m in ai_client.models.list():
             name = m.name.replace("models/", "")
@@ -57,6 +78,13 @@ def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
 - سعر الشراء 24: {buy_24k} د.ك | سعر البيع 24: {sell_24k} د.ك | الأونصة: {ounce}$
 - بيانات المحفظة: {portfolio_rows}
 - سؤال المستخدم: {user_question}"""
+    return _call_gemini_safe(prompt)
+
+def suggest_best_buy_zones(ounce, buy_24k, avg_cost, balance):
+    _, tech_summary = get_chart_and_technicals()
+    feed = feedparser.parse(config.RSS_NEWS_URL)
+    news_text = "\n".join([entry.title for entry in feed.entries[:6]])
+    prompt = config.build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text)
     return _call_gemini_safe(prompt)
 
 def generate_and_send_report(sheet_dashboard, send_notifications=False):
