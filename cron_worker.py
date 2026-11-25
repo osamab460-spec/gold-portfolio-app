@@ -11,7 +11,10 @@ import config
 
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"].strip().strip('"').strip("'")
 RAW_TG_TOKEN = os.environ.get("TELEGRAM_TOKEN", "").strip().strip('"').strip("'")
-TELEGRAM_TOKEN = RAW_TG_TOKEN.split("/bot")[-1].split("/") if "/bot" in RAW_TG_TOKEN else RAW_TG_TOKEN
+if "/bot" in RAW_TG_TOKEN:
+    TELEGRAM_TOKEN = RAW_TG_TOKEN.split("/bot")[-1].split("/")
+else:
+    TELEGRAM_TOKEN = RAW_TG_TOKEN
 
 GOOGLE_CREDENTIALS = os.environ["GOOGLE_CREDENTIALS"]
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "semsem_gold_kw_99").strip()
