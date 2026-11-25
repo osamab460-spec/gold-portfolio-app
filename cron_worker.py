@@ -15,7 +15,7 @@ SCHEME = "https:" + SLASH + SLASH
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"].strip().strip('"').strip("'")
 RAW_TG_TOKEN = os.environ.get("TELEGRAM_TOKEN", "").strip().strip('"').strip("'")
 if "bot" in RAW_TG_TOKEN and SLASH in RAW_TG_TOKEN:
-    TELEGRAM_TOKEN = RAW_TG_TOKEN.split("bot")[-1].split(SLASH)
+    TELEGRAM_TOKEN = RAW_TG_TOKEN.split("bot")[-1].split(SLASH)[0]
 else:
     TELEGRAM_TOKEN = RAW_TG_TOKEN
 
@@ -49,8 +49,7 @@ def send_all_channels(title, html_message, is_urgent=False):
     if TELEGRAM_TOKEN and ":" in TELEGRAM_TOKEN:
         try:
             tg_url = SCHEME + "api.telegram.org" + SLASH + "bot" + TELEGRAM_TOKEN + SLASH + "sendMessage"
-            r_tg = requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": html_message, "parse_mode": "HTML"}, timeout=15)
-            print("Telegram status:", r_tg.status_code, r_tg.text[:100])
+            requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": html_message, "parse_mode": "HTML"}, timeout=15)
         except Exception as e:
             print("Telegram warning:", e)
 
@@ -59,8 +58,7 @@ def send_all_channels(title, html_message, is_urgent=False):
         clean_text = html_message.replace("<b>", "*").replace("</b>", "*")
         encoded_text = urllib.parse.quote(clean_text[:950])
         wa_url = SCHEME + "://callmebot.com" + SLASH + "whatsapp.php?phone=" + str(config.WHATSAPP_PHONE) + "&apikey=" + str(config.WHATSAPP_APIKEY) + "&text=" + encoded_text
-        r_wa = requests.get(wa_url, timeout=15)
-        print("WhatsApp status:", r_wa.status_code)
+        requests.get(wa_url, timeout=15)
     except Exception as e:
         print("WhatsApp warning:", e)
 
@@ -71,17 +69,16 @@ def send_all_channels(title, html_message, is_urgent=False):
             priority = "urgent" if is_urgent else "high"
             tags = "rotating_light,chart_with_upwards_trend" if is_urgent else "coin"
             ntfy_url = SCHEME + "ntfy.sh" + SLASH + NTFY_TOPIC
-            r_ntfy = requests.post(
+            requests.post(
                 ntfy_url,
                 data=plain_text.encode("utf-8"),
                 headers={"Title": title.encode("utf-8"), "Priority": priority, "Tags": tags},
                 timeout=15
             )
-            print("ntfy status:", r_ntfy.status_code)
         except Exception as e:
             print("ntfy warning:", e)
 
-def run_quarter_hourly_monitor():
+def run_smart_monitor():
     creds_dict = json.loads(GOOGLE_CREDENTIALS)
     gc = gspread.service_account_from_dict(creds_dict)
     sh = gc.open_by_key(config.SPREADSHEET_ID)
@@ -103,60 +100,78 @@ def run_quarter_hourly_monitor():
     if ounce > 0:
         sheet_dashboard.update_acell("C5", ounce)
 
+    # قراءة خلايا الذاكرة من الإكسل:
+    # N5 = سعر الربع ساعة السابق | K5 = سعر الساعة السابقة | L5 = الاتجاه السابق
+    # O5 = سعر آخر تنبيه أُرسل (لمنع تفويت الصعود المتدرج) | P5 = رقم آخر ساعة مفحوصة
     try:
-        val_15m = sheet_dashboard.acell("N5").value
-        last_ounce_15m = float(val_15m) if val_15m else ounce
-
-        val_1h = sheet_dashboard.acell("K5").value
-        last_ounce_1h = float(val_1h) if val_1h else ounce
+        last_15m = float(sheet_dashboard.acell("N5").value or ounce)
+        last_1h = float(sheet_dashboard.acell("K5").value or ounce)
         last_trend = sheet_dashboard.acell("L5").value or "NEUTRAL"
+        last_alert_price = float(sheet_dashboard.acell("O5").value or ounce)
+        last_checked_hour = str(sheet_dashboard.acell("P5").value or "")
     except Exception:
-        last_ounce_15m = ounce
-        last_ounce_1h = ounce
-        last_trend = "NEUTRAL"
+        last_15m, last_1h, last_alert_price = ounce, ounce, ounce
+        last_trend, last_checked_hour = "NEUTRAL", ""
 
-    diff_15m = round(ounce - last_ounce_15m, 2)
-    diff_1h = round(ounce - last_ounce_1h, 2)
+    diff_15m = round(ounce - last_15m, 2)
+    diff_1h = round(ounce - last_1h, 2)
+    diff_since_last_alert = round(ounce - last_alert_price, 2)
 
     sheet_dashboard.update_acell("N5", ounce)
 
     now_kw_dt = datetime.now(config.KUWAIT_TZ)
     now_kw = now_kw_dt.strftime("%A, %Y-%m-%d %H:%M")
+    current_hour_str = now_kw_dt.strftime("%Y-%m-%d %H")
     current_hour = now_kw_dt.hour
-    current_minute = now_kw_dt.minute
 
     alert_header = ""
-    if diff_15m >= 25.0:
-        alert_header = f"⚡🚀 <b>إنذار صعود عنيف (15 دقيقة): الذهب قفز +{diff_15m}$ في ربع ساعة!</b>"
-    elif diff_15m <= -25.0:
-        alert_header = f"⚡🔻 <b>إنذار هبوط عنيف (15 دقيقة): الذهب هبط {diff_15m}$ في ربع ساعة!</b>"
 
+    # 1. فحص الحركة السريعة (25$ في 15 دقيقة) أو الحركة التراكمية (25$ منذ آخر تنبيه)
+    if diff_15m >= 25.0:
+        alert_header = f"⚡🚀 <b>قفزة صاروخية (15 دقيقة): الذهب ارتفع +{diff_15m}$ في ربع ساعة!</b>"
+    elif diff_15m <= -25.0:
+        alert_header = f"⚡🔻 <b>هبوط عنيف (15 دقيقة): الذهب تراجع {diff_15m}$ في ربع ساعة!</b>"
+    elif diff_since_last_alert >= 25.0:
+        alert_header = f"📈🚀 <b>موجة صعود قوية: الذهب ارتفع +{diff_since_last_alert}$ منذ آخر تنبيه!</b>"
+    elif diff_since_last_alert <= -25.0:
+        alert_header = f"📉🔻 <b>موجة هبوط قوية: الذهب تراجع {diff_since_last_alert}$ منذ آخر تنبيه!</b>"
+
+    # 2. فحص الانقلاب الساعي وسلسلة الشموع (يعمل مرة واحدة في كل ساعة جديدة مهما تأخر GitHub)
     sma_12h = round(float(hist_1h["Close"].tail(12).mean()), 2)
     current_trend = "UP" if ounce > sma_12h else "DOWN"
 
-    if current_minute < 15:
+    # فحص 3 شموع ساعية متتالية في نفس الاتجاه
+    last_3_closes = hist_1h["Close"].tail(4).tolist()
+    is_3_green = len(last_3_closes) == 4 and (last_3_closes[3] > last_3_closes[2] > last_3_closes[1] > last_3_closes[0])
+    is_3_red = len(last_3_closes) == 4 and (last_3_closes[3] < last_3_closes[2] < last_3_closes[1] < last_3_closes[0])
+
+    is_new_hour = (current_hour_str != last_checked_hour)
+    if is_new_hour:
         if not alert_header:
-            if last_trend == "DOWN" and current_trend == "UP" and diff_1h >= 6.0:
-                alert_header = "🔄📈 <b>تنبيه انقلاب صعودي: الذهب يرتد ويخترق المقاومة الساعية!</b>"
-            elif last_trend == "UP" and current_trend == "DOWN" and diff_1h <= -6.0:
-                alert_header = "🔄📉 <b>تنبيه انقلاب هبوطي: الذهب يكسر الدعم الساعي ويتجه للهبوط!</b>"
-            elif diff_1h >= 12.0:
-                alert_header = f"🚀 <b>قفزة صعودية ساعية: الذهب ارتفع +{diff_1h}$ خلال ساعة!</b>"
-            elif diff_1h <= -12.0:
-                alert_header = f"🔻 <b>هبوط ساعي سريع: الذهب تراجع {diff_1h}$ خلال ساعة!</b>"
+            if last_trend == "DOWN" and current_trend == "UP":
+                alert_header = "🔄📈 <b>تنبيه انقلاب صعودي: الذهب يرتد ويخترق المتوسط الساعي!</b>"
+            elif last_trend == "UP" and current_trend == "DOWN":
+                alert_header = "🔄📉 <b>تنبيه انقلاب هبوطي: الذهب يكسر المتوسط الساعي ويتجه للهبوط!</b>"
+            elif is_3_green:
+                alert_header = "🟢🚀 <b>زخم صعودي متواصل: 3 شموع خضراء متتالية على فريم الساعة!</b>"
+            elif is_3_red:
+                alert_header = "🔴🔻 <b>ضغط بيعي متواصل: 3 شموع حمراء متتالية على فريم الساعة!</b>"
 
         sheet_dashboard.update_acell("K5", ounce)
         sheet_dashboard.update_acell("L5", current_trend)
+        sheet_dashboard.update_acell("P5", current_hour_str)
 
     portfolio_rows = sheet_dashboard.get("A5:I18")
     portfolio_text = "\n".join([" | ".join(r) for r in portfolio_rows if r])
     targets_rows = sheet_dashboard.get("A19:B21")
     targets_text = "\n".join([" | ".join(r) for r in targets_rows if r])
 
+    # إرسال التنبيه العاجل وتحديث سعر آخر تنبيه في O5
     if alert_header:
+        sheet_dashboard.update_acell("O5", ounce)
         alert_prompt = f"""أنت مستشاري المالي لأسواق الذهب في الكويت (دار السبائك).
 حدث الآن تحرك سعري هام: {alert_header}
-- السعر الحالي للأونصة: {ounce}$ (تغير ربع ساعة: {diff_15m:+}$ | تغير ساعة: {diff_1h:+}$)
+- السعر الحالي للأونصة: {ounce}$ (التغير التراكمي: {diff_since_last_alert:+}$ | تغير الساعة: {diff_1h:+}$)
 - سعر شراء جرام 24 في دار السبائك: {buy_24k} د.ك | سعر البيع: {sell_24k} د.ك
 - بيانات محفظتي: {portfolio_text}
 - مستهدفات الشراء في ملفي: {targets_text}
@@ -165,18 +180,19 @@ def run_quarter_hourly_monitor():
 
         alert_reply = call_gemini_safe(alert_prompt)
         full_alert = f"{alert_header}\n\n{alert_reply}"
-        send_all_channels(f"إنذار ذهب عاجل: {buy_24k} د.ك", full_alert, is_urgent=True)
+        send_all_channels(f"تنبيه ذهب عاجل: {buy_24k} د.ك", full_alert, is_urgent=True)
 
+    # 3. التقرير الدوري الشامل (10ص، 2ظ، 6م، 10م بتوقيت الكويت)
     report_hours = (10, 14, 18, 22)
-    is_scheduled_report_hour = (current_hour in report_hours) and (current_minute < 15)
-    if is_scheduled_report_hour or os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+    if (is_new_hour and current_hour in report_hours) or os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+        sheet_dashboard.update_acell("O5", ounce)
         feed = feedparser.parse(config.RSS_NEWS_URL)
         news_text = "\n".join([entry.title for entry in feed.entries[:7]])
         prompt = config.build_report_prompt(now_kw, ounce, ch_day, chp_day, buy_24k, portfolio_text, targets_text, news_text)
         report_reply = call_gemini_safe(prompt)
         send_all_channels(f"تقرير دار السبائك: {buy_24k} د.ك", report_reply, is_urgent=False)
 
-    print(f"Checked at {now_kw} | Ounce: {ounce}$ | 15m Diff: {diff_15m}$ | 1h Diff: {diff_1h}$")
+    print(f"Checked at {now_kw} | Ounce: {ounce}$ | Since Alert: {diff_since_last_alert}$ | Trend: {current_trend}")
 
 if __name__ == "__main__":
-    run_quarter_hourly_monitor()
+    run_smart_monitor()
