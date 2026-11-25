@@ -9,10 +9,13 @@ from google import genai
 import yfinance as yf
 import config
 
+SLASH = chr(47)
+SCHEME = "https:" + SLASH + SLASH
+
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"].strip().strip('"').strip("'")
 RAW_TG_TOKEN = os.environ.get("TELEGRAM_TOKEN", "").strip().strip('"').strip("'")
-if "/bot" in RAW_TG_TOKEN:
-    TELEGRAM_TOKEN = RAW_TG_TOKEN.split("/bot")[-1].split("/")
+if "bot" in RAW_TG_TOKEN and SLASH in RAW_TG_TOKEN:
+    TELEGRAM_TOKEN = RAW_TG_TOKEN.split("bot")[-1].split(SLASH)
 else:
     TELEGRAM_TOKEN = RAW_TG_TOKEN
 
@@ -25,7 +28,7 @@ def call_gemini_safe(prompt):
     models_to_try = ["gemini-3.8-flash", "gemini-3-flash-preview", "gemini-2.5-flash"]
     try:
         for m in ai_client.models.list():
-            name = m.name.replace("models/", "")
+            name = m.name.replace("models" + SLASH, "")
             if "flash" in name and name not in models_to_try:
                 models_to_try.append(name)
     except Exception:
@@ -45,7 +48,7 @@ def send_all_channels(title, html_message, is_urgent=False):
     # 1. تيليجرام
     if TELEGRAM_TOKEN and ":" in TELEGRAM_TOKEN:
         try:
-            tg_url = f"https://telegram.org{TELEGRAM_TOKEN}/sendMessage"
+            tg_url = SCHEME + "api.telegram.org" + SLASH + "bot" + TELEGRAM_TOKEN + SLASH + "sendMessage"
             r_tg = requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": html_message, "parse_mode": "HTML"}, timeout=15)
             print("Telegram status:", r_tg.status_code, r_tg.text[:100])
         except Exception as e:
@@ -55,7 +58,7 @@ def send_all_channels(title, html_message, is_urgent=False):
     try:
         clean_text = html_message.replace("<b>", "*").replace("</b>", "*")
         encoded_text = urllib.parse.quote(clean_text[:950])
-        wa_url = f"https://callmebot.com{config.WHATSAPP_PHONE}&apikey={config.WHATSAPP_APIKEY}&text={encoded_text}"
+        wa_url = SCHEME + "://callmebot.com" + SLASH + "whatsapp.php?phone=" + str(config.WHATSAPP_PHONE) + "&apikey=" + str(config.WHATSAPP_APIKEY) + "&text=" + encoded_text
         r_wa = requests.get(wa_url, timeout=15)
         print("WhatsApp status:", r_wa.status_code)
     except Exception as e:
@@ -67,7 +70,7 @@ def send_all_channels(title, html_message, is_urgent=False):
             plain_text = html_message.replace("<b>", "").replace("</b>", "")
             priority = "urgent" if is_urgent else "high"
             tags = "rotating_light,chart_with_upwards_trend" if is_urgent else "coin"
-            ntfy_url = f"https://ntfy.sh{NTFY_TOPIC}"
+            ntfy_url = SCHEME + "ntfy.sh" + SLASH + NTFY_TOPIC
             r_ntfy = requests.post(
                 ntfy_url,
                 data=plain_text.encode("utf-8"),
