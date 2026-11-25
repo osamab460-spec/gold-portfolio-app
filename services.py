@@ -31,7 +31,6 @@ def get_live_gold():
     return ounce, ch, chp, buy_24k, sell_24k
 
 def _call_gemini_safe(prompt):
-    # تجربة النماذج المتاحة بالترتيب لضمان عدم توقف الخدمة أبداً
     models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
     last_error = ""
     for model_name in models_to_try:
@@ -41,7 +40,7 @@ def _call_gemini_safe(prompt):
         except Exception as e:
             last_error = str(e)
             continue
-    return f"⚠️ تعذر الاتصال بالذكاء الاصطناعي حالياً. السبب التقني: {last_error}"
+    return f"⚠️ تعذر الاتصال بالذكاء الاصطناعي. السبب: {last_error}"
 
 def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
     prompt = f"""أنت حاسبة ذكية ومستشار مالي لمحفظة ذهب (دار السبائك - الكويت). أجب باختصار شديد وبالعربية:
