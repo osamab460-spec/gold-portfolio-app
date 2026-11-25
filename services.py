@@ -7,7 +7,6 @@ import gspread
 from google import genai
 import config
 
-# تهيئة الذكاء الاصطناعي
 ai_client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 @st.cache_resource
@@ -18,11 +17,25 @@ def init_sheets():
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
 def get_live_gold():
-    headers = {"User-Agent": "Mozilla/5.0"}
-    res = requests.get(config.GOLD_API_URL, headers=headers, timeout=15).json()
-    ounce = float(res.get("price", 0))
-    ch = float(res.get("ch", 0))
-    chp = float(res.get("chp", 0))
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    ounce, ch, chp = 0.0, 0.0, 0.0
+
+    # المصدر الأول: Yahoo Finance API (لا يحظر خوادم السحابة ومجاني 100%)
+    try:
+        url = "https://yahoo.com"
+        r = requests.get(url, headers=headers, timeout=10).json()
+        meta = r["chart"]["result"][0]["meta"]
+        ounce = float(meta["regularMarketPrice"])
+        prev_close = float(meta.get("chartPreviousClose", ounce))
+        ch = round(ounce - prev_close, 2)
+        chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
+    except Exception:
+        # المصدر الاحتياطي: Gold-API
+        res = requests.get(config.GOLD_API_URL, headers=headers, timeout=10).json()
+        ounce = float(res.get("price", 0))
+        ch = float(res.get("ch", 0))
+        chp = float(res.get("chp", 0))
+
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
     return ounce, ch, chp, buy_24k, sell_24k
@@ -37,7 +50,8 @@ def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
 
 def generate_and_send_report(sheet_dashboard, send_notifications=False):
     ounce, ch, chp, buy_24k, sell_24k = get_live_gold()
-    sheet_dashboard.update_acell("C5", ounce)
+    if ounce > 0:
+        sheet_dashboard.update_acell("C5", ounce)
 
     portfolio_rows = sheet_dashboard.get("A5:I18")
     portfolio_text = "\n".join([" | ".join(r) for r in portfolio_rows if r])
