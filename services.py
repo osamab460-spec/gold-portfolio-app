@@ -31,18 +31,27 @@ def get_live_gold():
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
     return ounce, ch, chp, buy_24k, sell_24k
 
-def get_chart_and_technicals():
+def get_pro_chart_data():
     ticker = yf.Ticker("GC=F")
-    hist = ticker.history(period="1mo")
+    hist = ticker.history(period="1mo", interval="1d")
     
-    # حساب السعر الكويتي لكل يوم للرسم البياني
-    df = pd.DataFrame()
-    df["سعر جرام 24 (د.ك)"] = ((hist["Close"] / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR).round(3)
+    df = pd.DataFrame(index=hist.index)
+    factor = config.KUWAIT_FACTOR / config.OUNCE_TO_GRAM
+    df["Open"] = (hist["Open"] * factor).round(3)
+    df["High"] = (hist["High"] * factor).round(3)
+    df["Low"] = (hist["Low"] * factor).round(3)
+    df["Close"] = (hist["Close"] * factor).round(3)
     
-    # حساب المؤشرات الفنية (أعلى، أدنى، متوسط متحرك، RSI)
+    # حساب البولينجر باند (20 يوم)
+    df["SMA20"] = df["Close"].rolling(window=20).mean().round(3)
+    std20 = df["Close"].rolling(window=20).std()
+    df["UpperBB"] = (df["SMA20"] + (std20 * 2)).round(3)
+    df["LowerBB"] = (df["SMA20"] - (std20 * 2)).round(3)
+
+    # المؤشرات الفنية للذكاء الاصطناعي
     high_30d = round(float(hist["High"].max()), 2)
     low_30d = round(float(hist["Low"].min()), 2)
-    sma_20 = round(float(hist["Close"].tail(20).mean()), 2)
+    sma_20_usd = round(float(hist["Close"].tail(20).mean()), 2)
     
     delta = hist["Close"].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
@@ -50,11 +59,22 @@ def get_chart_and_technicals():
     rs = gain / loss
     rsi = round(float(100 - (100 / (1 + rs.iloc[-1]))), 1)
     
-    tech_summary = f"أعلى سعر 30 يوم: {high_30d}$ | أدنى سعر 30 يوم: {low_30d}$ | المتوسط المتحرك 20 يوم: {sma_20}$ | مؤشر القوة النسبية (RSI 14): {rsi}"
+    tech_summary = f"أعلى سعر 30 يوم: {high_30d}$ | أدنى سعر 30 يوم: {low_30d}$ | المتوسط المتحرك 20 يوم: {sma_20_usd}$ | مؤشر القوة النسبية (RSI 14): {rsi}"
     return df, tech_summary
 
+def get_economic_radar():
+    # فحص الأخبار الاقتصادية عالية التأثير (FOMC, CPI, NFP, Fed, Powell)
+    feed = feedparser.parse(config.RSS_NEWS_URL)
+    high_impact_keywords = ["FOMC", "CPI", "NFP", "Non-Farm", "Powell", "Interest Rate", "Inflation", "Fed "]
+    alerts = []
+    for entry in feed.entries[:10]:
+        title = entry.title
+        if any(kw.lower() in title.lower() for kw in high_impact_keywords):
+            alerts.append(title)
+    return alerts[:3]
+
 def _call_gemini_safe(prompt):
-    models_to_try = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"]
+    models_to_try = ["gemini-3.8-flash", "gemini-3-flash-preview", "gemini-2.5-flash"]
     try:
         for m in ai_client.models.list():
             name = m.name.replace("models/", "")
@@ -81,7 +101,7 @@ def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
     return _call_gemini_safe(prompt)
 
 def suggest_best_buy_zones(ounce, buy_24k, avg_cost, balance):
-    _, tech_summary = get_chart_and_technicals()
+    _, tech_summary = get_pro_chart_data()
     feed = feedparser.parse(config.RSS_NEWS_URL)
     news_text = "\n".join([entry.title for entry in feed.entries[:6]])
     prompt = config.build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text)
