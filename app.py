@@ -12,25 +12,29 @@ st.markdown("""
     header[data-testid="stHeader"], footer { display: none !important; }
     .block-container { padding-top: 0.8rem !important; padding-bottom: 2rem !important; max-width: 680px; }
 
-    /* بطاقات البيع والشراء المزدوجة مثل المنصة في الصورة */
+    /* إجبار جميع النصوص والعناوين والمدخلات داخل التبويبات على الظهور بلون داكن واضح */
+    h1, h2, h3, h4, h5, p, span, label, div[data-testid="stMarkdownContainer"] * { color: #1E2329 !important; }
+    input, textarea, select { background-color: #F8F9FA !important; color: #1E2329 !important; border: 1px solid #DCDFE4 !important; }
+
+    /* بطاقات البيع والشراء المزدوجة */
     .trade-box-sell { background-color: #FFF2F4; border: 1px solid #FAD1D8; border-radius: 10px; padding: 10px; text-align: center; }
     .trade-box-buy { background-color: #EBF9F4; border: 1px solid #C2EEDF; border-radius: 10px; padding: 10px; text-align: center; }
-    .sell-label { color: #F6465D; font-size: 0.8rem; font-weight: 700; }
-    .sell-price { color: #F6465D; font-size: 1.25rem; font-weight: 800; }
-    .buy-label { color: #00B87A; font-size: 0.8rem; font-weight: 700; }
-    .buy-price { color: #00B87A; font-size: 1.25rem; font-weight: 800; }
+    .sell-label, .sell-price { color: #F6465D !important; font-weight: 800; }
+    .sell-label { font-size: 0.8rem; } .sell-price { font-size: 1.25rem; }
+    .buy-label, .buy-price { color: #00B87A !important; font-weight: 800; }
+    .buy-label { font-size: 0.8rem; } .buy-price { font-size: 1.25rem; }
 
     /* بطاقات المحفظة البيضاء النظيفة */
     .light-card { background-color: #F8F9FA; border: 1px solid #EAECEF; border-radius: 12px; padding: 10px 12px; text-align: center; margin-bottom: 8px; }
-    .light-title { color: #707A8A; font-size: 0.74rem; margin-bottom: 2px; font-weight: 600; }
-    .light-val { color: #1E2329; font-size: 1.15rem; font-weight: 800; }
-    .gold-badge { background-color: #FEF6D8; color: #C99400; padding: 3px 10px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; }
+    .light-title { color: #707A8A !important; font-size: 0.74rem; margin-bottom: 2px; font-weight: 600; }
+    .light-val { color: #1E2329 !important; font-size: 1.15rem; font-weight: 800; }
+    .gold-badge { background-color: #FEF6D8; color: #C99400 !important; padding: 3px 10px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; }
 
     /* شريط بيانات OHLC أعلى الشارت */
-    .ohlc-bar { background-color: #F8F9FA; border: 1px solid #EAECEF; border-radius: 8px; padding: 6px 10px; font-size: 0.75rem; color: #474D57; display: flex; justify-content: space-between; margin-bottom: 6px; direction: ltr; }
+    .ohlc-bar { background-color: #F8F9FA; border: 1px solid #EAECEF; border-radius: 8px; padding: 6px 10px; font-size: 0.75rem; color: #474D57 !important; display: flex; justify-content: space-between; margin-bottom: 6px; direction: ltr; }
 
     .stButton>button { width: 100%; border-radius: 10px; height: 3em; font-weight: 700; background-color: #FCD535 !important; color: #1E2329 !important; border: none !important; }
-    button[data-baseweb="tab"] { font-size: 0.85rem !important; font-weight: 700 !important; color: #474D57 !important; }
+    button[data-baseweb="tab"] { font-size: 0.85rem !important; font-weight: 700 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -102,7 +106,6 @@ except ValueError:
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Trading Chart", "🎯 القنص AI", "🧮 الحاسبة", "➕ صفقة", "📜 السجل"])
 
 with tab1:
-    # أزرار الأطر الزمنية المتعددة تماماً مثل الصورة (15M, 1H, 4H, 1D, 1W)
     tf_code = st.radio("Timeframe", ["15M", "1H", "4H", "1D", "1W"], index=3, horizontal=True, label_visibility="collapsed")
 
     try:
@@ -110,7 +113,6 @@ with tab1:
         last_row = df_chart.iloc[-1]
         last_dt = df_chart.index[-1].strftime("%Y-%m-%d %H:%M")
 
-        # شريط بيانات الشمعة الأخيرة (Date, Open, High, Low, Close)
         st.markdown(f"""
         <div class="ohlc-bar">
             <span><b>{last_dt}</b></span>
@@ -123,7 +125,7 @@ with tab1:
 
         fig = go.Figure()
 
-        # 1. الشموع اليابانية النظيفة بألوان المنصة (أخضر زمردي وأحمر)
+        # 1. الشموع اليابانية
         fig.add_trace(go.Candlestick(
             x=df_chart.index,
             open=df_chart["Open"],
@@ -137,7 +139,7 @@ with tab1:
             name="سعر الجرام"
         ))
 
-        # 2. علامات شمعات المطرقة المكتشفة تلقائياً
+        # 2. علامات شمعات المطرقة
         hammers = df_chart[df_chart["Hammer"] == True]
         if not hammers.empty:
             fig.add_trace(go.Scatter(
@@ -150,7 +152,7 @@ with tab1:
                 name="مطرقة"
             ))
 
-        # 3. خط السعر الحالي المتقطع (مثل الخط الأخضر المتقطع في الصورة)
+        # 3. خط السعر الحالي المتقطع
         if buy_24k > 0:
             fig.add_hline(
                 y=buy_24k,
@@ -163,14 +165,14 @@ with tab1:
                 annotation_position="right"
             )
 
-        # 4. خط متوسط تكلفتك (نقطة التعادل) باللون الرمادي الداكن مثل مربع السعر في الصورة
+        # 4. خط متوسط تكلفتك (نقطة التعادل)
         if curr_avg > 0:
             fig.add_hline(
                 y=curr_avg,
                 line_dash="dash",
                 line_color="#474D57",
                 line_width=1.3,
-                annotation_text=f" متوسطك {curr_avg:.3f} ",
+                annotation_text=f" {curr_avg:.3f} ",
                 annotation_bgcolor="#474D57",
                 annotation_font_color="#FFFFFF",
                 annotation_position="right"
@@ -183,7 +185,7 @@ with tab1:
             xaxis_rangeslider_visible=False,
             dragmode=False,
             height=340,
-            margin=dict(l=5, r=55, t=10, b=10),
+            margin=dict(l=5, r=60, t=10, b=10),
             showlegend=False
         )
         fig.update_xaxes(showgrid=True, gridcolor="#F0F2F5", linecolor="#EAECEF")
@@ -191,15 +193,15 @@ with tab1:
 
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-        # شريط معنويات السوق (Sentiment Bar: الثور الأخضر مقابل الدب الأحمر) مثل أسفل يمين الصورة
+        # شريط معنويات السوق
         bull_pct = int(min(max(last_rsi, 15), 85))
         bear_pct = 100 - bull_pct
         st.markdown(f"""
         <div style="margin-top:4px; margin-bottom:12px;">
             <div style="display:flex; justify-content:space-between; font-size:0.78rem; font-weight:800; margin-bottom:3px;">
-                <span style="color:#00B87A;">🐂 المشترون {bull_pct}%</span>
-                <span style="color:#707A8A;">معنويات السوق (SENTIMENT)</span>
-                <span style="color:#F6465D;">{bear_pct}% البائعون 🐻</span>
+                <span style="color:#00B87A !important;">🐂 المشترون {bull_pct}%</span>
+                <span style="color:#707A8A !important;">معنويات السوق (SENTIMENT)</span>
+                <span style="color:#F6465D !important;">{bear_pct}% البائعون 🐻</span>
             </div>
             <div style="width:100%; height:7px; background-color:#F6465D; border-radius:5px; overflow:hidden;">
                 <div style="width:{bull_pct}%; height:100%; background-color:#00B87A;"></div>
@@ -210,10 +212,10 @@ with tab1:
     except Exception as e:
         st.caption(f"جاري تحميل الشارت... ({e})")
 
-    # بطاقات المحفظة الأربعة أسفل الشارت بتصميم نظيف
     r1c1, r1c2 = st.columns(2)
     with r1c1:
         st.markdown(f'<div class="light-card"><div class="light-title">رصيد الذهب</div><div class="light-val">{gold_balance_str} جم</div></div>', unsafe_allow_html=True)
     with r1c2:
         st.markdown(f'<div class="light-card"><div class="light-title">متوسط التكلفة</div><div class="light-val">{avg_cost_str} د.ك</div></div>', unsafe_allow_html=True)
 
+    r2c1, r2c2 = st.columns(2)
