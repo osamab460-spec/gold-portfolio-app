@@ -140,17 +140,22 @@ with tab1:
                 annotation_position="top left"
             )
 
-        # رسم نقاط صفقات الشراء المسجلة في الإكسل على الشارت
+        # رسم نقاط صفقات الشراء المسجلة في الإكسل على الشارت بدون استخدام أقواس مربعة
         log_rows = sheet_log.get_all_values()
         buy_dates, buy_prices = [], []
         chart_start = df_chart.index.min().strftime("%Y-%m-%d")
-        for r in log_rows[1:]:
-            if len(r) >= 4 and "شراء" in r and r >= chart_start:
-                try:
-                    buy_dates.append(r)
-                    buy_prices.append(float(r))
-                except ValueError:
-                    pass
+        for r in log_rows:
+            if len(r) >= 4:
+                it = iter(r)
+                op_date = str(next(it, ""))
+                op_type_val = str(next(it, ""))
+                op_price_val = str(next(it, ""))
+                if "شراء" in op_type_val and op_date >= chart_start:
+                    try:
+                        buy_dates.append(op_date)
+                        buy_prices.append(float(op_price_val))
+                    except ValueError:
+                        pass
 
         if buy_dates:
             fig.add_trace(go.Scatter(
@@ -247,12 +252,4 @@ with tab5:
     all_rows = sheet_log.get_all_values()
     last_5 = list(reversed(all_rows))[:5]
     for r in last_5:
-        if len(r) >= 4 and r != "التاريخ":
-            st.write(" • ".join(r[:4]))
-
-    st.divider()
-    if st.button("🗑️ حذف آخر صفقة مسجلة"):
-        if len(all_rows) > 1:
-            sheet_log.delete_rows(len(all_rows))
-            st.warning("تم حذف آخر صفقة وتحديث الرصيد!")
-            st.rerun()
+        if len(r) >= 4 and "التاريخ" not in str(r):
