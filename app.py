@@ -10,7 +10,6 @@ st.markdown("""
 <style>
     header[data-testid="stHeader"], footer { display: none !important; }
     .block-container { padding-top: 0.8rem !important; padding-bottom: 2rem !important; max-width: 680px; }
-    p, h1, h2, h3, h4, h5, label, .rtl-box { direction: rtl; text-align: right; }
     .trade-box-sell { background-color: #FFF2F4; border: 1px solid #FAD1D8; border-radius: 10px; padding: 10px; text-align: center; }
     .trade-box-buy { background-color: #EBF9F4; border: 1px solid #C2EEDF; border-radius: 10px; padding: 10px; text-align: center; }
     .sell-label { color: #F6465D; font-size: 0.8rem; font-weight: 800; }
@@ -22,8 +21,8 @@ st.markdown("""
     .light-val { color: #1E2329; font-size: 1.15rem; font-weight: 800; }
     .gold-badge { background-color: #FEF6D8; color: #C99400; padding: 3px 10px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; }
     .ohlc-bar { background-color: #F8F9FA; border: 1px solid #EAECEF; border-radius: 8px; padding: 6px 10px; font-size: 0.75rem; color: #474D57; display: flex; justify-content: space-between; margin-bottom: 6px; direction: ltr; }
+    .rtl-box { direction: rtl; text-align: right; color: #1E2329; line-height: 1.7; }
     .stButton>button { width: 100%; border-radius: 10px; height: 3em; font-weight: 700; background-color: #FCD535 !important; color: #1E2329 !important; border: none !important; }
-    button[data-baseweb="tab"] { font-size: 0.85rem !important; font-weight: 700 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -49,6 +48,7 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
+# ================= شريط الأسعار الحية =================
 try:
     ounce, ch, chp, buy_24k, sell_24k = services.get_live_gold()
     if ounce > 0:
@@ -91,9 +91,14 @@ try:
 except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Trading Chart", "🎯 القنص AI", "🧮 الحاسبة", "➕ صفقة", "📜 السجل"])
+st.write("")
+# ================= شريط التنقل بين الشاشات (يعمل 100% على جميع هواتف الأندرويد) =================
+nav_options = ["📊 الشارت", "🎯 القنص AI", "🧮 الحاسبة", "➕ صفقة", "📜 السجل"]
+selected_page = st.radio("القائمة", nav_options, horizontal=True, label_visibility="collapsed")
+st.divider()
 
-with tab1:
+# ================= 1. شاشة الشارت والمحفظة =================
+if selected_page == "📊 الشارت":
     tf_code = st.radio("Timeframe", ["15M", "1H", "4H", "1D", "1W"], index=3, horizontal=True, label_visibility="collapsed")
 
     try:
@@ -112,7 +117,6 @@ with tab1:
         """, unsafe_allow_html=True)
 
         fig = go.Figure()
-
         fig.add_trace(go.Candlestick(
             x=df_chart.index,
             open=df_chart["Open"],
@@ -139,39 +143,12 @@ with tab1:
             ))
 
         if buy_24k > 0:
-            fig.add_hline(
-                y=buy_24k,
-                line_dash="dot",
-                line_color="#00B87A",
-                line_width=1.2,
-                annotation_text=f" {buy_24k:.3f} ",
-                annotation_bgcolor="#00B87A",
-                annotation_font_color="#FFFFFF",
-                annotation_position="right"
-            )
+            fig.add_hline(y=buy_24k, line_dash="dot", line_color="#00B87A", line_width=1.2, annotation_text=f" {buy_24k:.3f} ", annotation_bgcolor="#00B87A", annotation_font_color="#FFFFFF", annotation_position="right")
 
         if curr_avg > 0:
-            fig.add_hline(
-                y=curr_avg,
-                line_dash="dash",
-                line_color="#474D57",
-                line_width=1.3,
-                annotation_text=f" {curr_avg:.3f} ",
-                annotation_bgcolor="#474D57",
-                annotation_font_color="#FFFFFF",
-                annotation_position="right"
-            )
+            fig.add_hline(y=curr_avg, line_dash="dash", line_color="#474D57", line_width=1.3, annotation_text=f" {curr_avg:.3f} ", annotation_bgcolor="#474D57", annotation_font_color="#FFFFFF", annotation_position="right")
 
-        fig.update_layout(
-            template="plotly_white",
-            paper_bgcolor="#FFFFFF",
-            plot_bgcolor="#FFFFFF",
-            xaxis_rangeslider_visible=False,
-            dragmode=False,
-            height=340,
-            margin=dict(l=5, r=60, t=10, b=10),
-            showlegend=False
-        )
+        fig.update_layout(template="plotly_white", paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF", xaxis_rangeslider_visible=False, dragmode=False, height=340, margin=dict(l=5, r=60, t=10, b=10), showlegend=False)
         fig.update_xaxes(showgrid=True, gridcolor="#F0F2F5", linecolor="#EAECEF")
         fig.update_yaxes(showgrid=True, gridcolor="#F0F2F5", linecolor="#EAECEF", side="right")
 
@@ -191,7 +168,6 @@ with tab1:
             </div>
         </div>
         """, unsafe_allow_html=True)
-
     except Exception as e:
         st.caption(f"جاري تحميل الشارت... ({e})")
 
@@ -210,9 +186,8 @@ with tab1:
     if st.button("🔄 تحديث الأسعار والبيانات"):
         st.rerun()
 
-with tab2:
-    st.markdown("#### 🎯 أفضل 3 مناطق شراء مقترحة")
-    st.caption("تحليل فني + الأخبار الحية لتحديد نقاط تعزيز محفظتك.")
+# ================= 2. شاشة القنص الذكي والمستشار AI =================
+elif selected_page == "🎯 القنص AI":
+    st.markdown("<h4 class='rtl-box'>🎯 أفضل 3 مناطق شراء مقترحة</h4>", unsafe_allow_html=True)
+    st.markdown("<p class='rtl-box' style='color:#707A8A; font-size:0.85rem;'>تحليل فني + الأخبار الحية لتحديد نقاط تعزيز محفظتك.</p>", unsafe_allow_html=True)
     if st.button("🔍 استخرج مناطق القنص الآن"):
-        with st.spinner("جاري تحليل الشارت والأخبار..."):
-            zones = services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams)
