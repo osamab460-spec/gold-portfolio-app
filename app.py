@@ -1,10 +1,11 @@
 import streamlit as st
 from datetime import datetime
+import plotly.graph_objects as go
 import config
 import services
 
 st.set_page_config(
-    page_title="دار السبائك AI",
+    page_title="دار السبائك AI Pro",
     page_icon="🪙",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -20,7 +21,7 @@ st.markdown("""
 
 sheet_dashboard, sheet_log = services.init_sheets()
 
-# ================= التحقق من رابط الجدولة التلقائية (Cron) قبل القفل =================
+# ================= التحقق من رابط الجدولة التلقائية =================
 if st.query_params.get("cron") == "run":
     services.generate_and_send_report(sheet_dashboard, send_notifications=True)
     st.success("CRON_OK")
@@ -32,7 +33,7 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.title("🔐 محفظة دار السبائك AI")
+    st.title("🔐 محفظة دار السبائك AI Pro")
     pin_input = st.text_input("أدخل الرقم السري للدخول", type="password", max_chars=8)
     if st.button("دخول المحفظة"):
         if pin_input == str(APP_PIN):
@@ -42,8 +43,8 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-# ================= 2. شريط الأسعار الحية =================
-st.title("🪙 محفظة دار السبائك AI")
+# ================= 2. شريط الأسعار الحية ورادار البيانات الاقتصادية =================
+st.title("🪙 محفظة دار السبائك AI Pro")
 
 try:
     ounce, ch, chp, buy_24k, sell_24k = services.get_live_gold()
@@ -58,9 +59,20 @@ except Exception as e:
     ounce, buy_24k, sell_24k = 0, 0, 0
     st.warning(f"تنبيه السعر الحي: {e}")
 
+# رادار البيانات الاقتصادية (Volatility Shield)
+try:
+    eco_alerts = services.get_economic_radar()
+    if eco_alerts:
+        with st.expander("🛡️ رادار البيانات الاقتصادية الحية (تقلبات متوقعة)", expanded=False):
+            st.caption("تنبيه: وجود أخبار الفيدرالي أو التضخم قد يسبب تذبذباً حاداً (±30$):")
+            for item in eco_alerts:
+                st.write(f"• {item}")
+except Exception:
+    pass
+
 st.divider()
 
-# قراءة بيانات المحفظة الأساسية للاستخدام في التبويبات
+# قراءة بيانات المحفظة الأساسية
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 market_val_str = sheet_dashboard.acell("C15").value or "0"
@@ -72,16 +84,16 @@ try:
 except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
-# ================= 3. تبويبات التطبيق الخمسة =================
+# ================= 3. تبويبات التطبيق =================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📊 المحفظة",
+    "📊 المحفظة والشارت",
     "🎯 مناطق الشراء",
     "🧮 الحاسبة والزكاة",
     "➕ صفقة",
     "📜 السجل"
 ])
 
-# --- التبويب 1: موقف المحفظة والرسم البياني ---
+# --- التبويب 1: موقف المحفظة والشارت الاحترافي (Candlesticks + Bollinger + صفقاتك) ---
 with tab1:
     c1, c2 = st.columns(2)
     c1.metric("رصيد الذهب", f"{gold_balance_str} جم")
@@ -91,14 +103,72 @@ with tab1:
     c3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
     c4.metric("القيمة السوقية", f"{market_val_str}")
 
-    st.subheader("📈 حركة سعر جرام 24 (آخر 30 يوماً)")
+    st.subheader("🕯️ شارت جرام 24 الاحترافي (30 يوماً)")
     try:
-        chart_df, _ = services.get_chart_and_technicals()
+        df_chart, _ = services.get_pro_chart_data()
+        fig = go.Figure()
+
+        # الشموع اليابانية
+        fig.add_trace(go.Candlestick(
+            x=df_chart.index,
+            open=df_chart["Open"],
+            high=df_chart["High"],
+            low=df_chart["Low"],
+            close=df_chart["Close"],
+            name="سعر الجرام (د.ك)"
+        ))
+
+        # البولينجر باند (حدود التشبع البيعي والشرائي)
+        fig.add_trace(go.Scatter(
+            x=df_chart.index, y=df_chart["LowerBB"],
+            line=dict(color="rgba(0, 200, 100, 0.5)", width=1, dash="dot"),
+            name="منطقة تشبع بيعي (دعم)"
+        ))
+        fig.add_trace(go.Scatter(
+            x=df_chart.index, y=df_chart["UpperBB"],
+            line=dict(color="rgba(255, 165, 0, 0.5)", width=1, dash="dot"),
+            name="منطقة تشبع شرائي (مقاومة)"
+        ))
+
+        # خط متوسط تكلفتك الحالي (نقطة التعادل)
         if curr_avg > 0:
-            chart_df["متوسط تكلفتك (د.ك)"] = curr_avg
-        st.line_chart(chart_df)
-    except Exception:
-        st.info("جاري تحميل بيانات الرسم البياني...")
+            fig.add_hline(
+                y=curr_avg,
+                line_dash="dash",
+                line_color="red",
+                annotation_text=f"متوسط تكلفتك: {curr_avg:.3f} د.ك",
+                annotation_position="top left"
+            )
+
+        # رسم نقاط صفقات الشراء المسجلة في الإكسل على الشارت
+        log_rows = sheet_log.get_all_values()
+        buy_dates, buy_prices = [], []
+        chart_start = df_chart.index.min().strftime("%Y-%m-%d")
+        for r in log_rows[1:]:
+            if len(r) >= 4 and "شراء" in r and r >= chart_start:
+                try:
+                    buy_dates.append(r)
+                    buy_prices.append(float(r))
+                except ValueError:
+                    pass
+
+        if buy_dates:
+            fig.add_trace(go.Scatter(
+                x=buy_dates, y=buy_prices,
+                mode="markers",
+                marker=dict(symbol="triangle-up", size=12, color="#00E676", line=dict(width=1, color="black")),
+                name="صفقات شرائك"
+            ))
+
+        fig.update_layout(
+            xaxis_rangeslider_visible=False,
+            height=420,
+            margin=dict(l=10, r=10, t=30, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.info(f"جاري تجهيز الشارت الاحترافي... ({e})")
 
     if st.button("🔄 تحديث البيانات والأسعار"):
         st.rerun()
