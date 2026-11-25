@@ -2,9 +2,9 @@ name: Semsem Gold Alerts
 
 on:
   schedule:
-    # يعمل تلقائياً كل ربع ساعة (15 دقيقة) على مدار اليوم
-    - cron: '*/15 * * * *'
-  workflow_dispatch: # يتيح لك تشغيله يدوياً في أي وقت
+    # يعمل تلقائياً كل 5 دقائق على مدار الساعة (24/7)
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
 
 jobs:
   send-report:
@@ -27,7 +27,4 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-
         run: python cron_worker.py
-
-        
