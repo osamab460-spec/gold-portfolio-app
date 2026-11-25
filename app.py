@@ -3,7 +3,6 @@ from datetime import datetime
 import config
 import services
 
-# ================= إعدادات واجهة الموبايل =================
 st.set_page_config(
     page_title="دار السبائك AI",
     page_icon="🪙",
@@ -50,15 +49,15 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 المحفظة", "➕ صفقة جديد�
 
 with tab1:
     rows = sheet_dashboard.get("A15:I15")
-    row = rows[0] if rows else ["0"] * 9
+    row = rows if rows else ["0"] * 9
     
     c1, c2 = st.columns(2)
-    c1.metric("رصيد الذهب", f"{row[0] if len(row)>0 else '0'} جم")
-    c2.metric("متوسط التكلفة", f"{row[1] if len(row)>1 else '0'} د.ك")
+    c1.metric("رصيد الذهب", f"{row if len(row)>0 else '0'} جم")
+    c2.metric("متوسط التكلفة", f"{row if len(row)>3 else '0'} د.ك")
 
     c3, c4 = st.columns(2)
-    c3.metric("القيمة السوقية", f"{row[2] if len(row)>2 else '0'} د.ك")
-    c4.metric("الربح / الخسارة", f"{row[3] if len(row)>3 else '0'} د.ك")
+    c3.metric("إجمالي التكلفة", f"{row if len(row)>1 else '0'} د.ك")
+    c4.metric("القيمة السوقية", f"{row if len(row)>2 else '0'}")
 
     if st.button("🔄 تحديث البيانات والأسعار"):
         st.rerun()
@@ -96,7 +95,7 @@ with tab4:
     last_5 = all_rows[-5:][::-1]
     for r in last_5:
         if len(r) >= 4:
-            st.write(f"• **{r[0]}** | {r[1]}: {r[3]} جم بسعر {r[2]} د.ك")
+            st.write(f"• **{r}** | {r}: {r} جم بسعر {r} د.ك")
 
     st.divider()
     if st.button("🗑️ حذف آخر صفقة مسجلة"):
