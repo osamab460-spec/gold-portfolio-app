@@ -4,7 +4,6 @@ import feedparser
 from datetime import datetime
 import streamlit as st
 import gspread
-from google.oauth2.service_account import Credentials
 from google import genai
 import config
 
@@ -13,13 +12,8 @@ ai_client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 @st.cache_resource
 def init_sheets():
-    scopes = [
-        "https://googleapis.com",
-        "https://googleapis.com"
-    ]
     creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-    gc = gspread.authorize(creds)
+    gc = gspread.service_account_from_dict(creds_dict)
     sh = gc.open_by_key(config.SPREADSHEET_ID)
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
@@ -46,11 +40,11 @@ def generate_and_send_report(sheet_dashboard, send_notifications=False):
 
     portfolio_rows = sheet_dashboard.get("A5:I18")
     portfolio_text = "\n".join([
-        f"{r[0] if len(r)>0 else ''} {r[2] if len(r)>2 else ''} {r[5] if len(r)>5 else ''} {r[7] if len(r)>7 else ''}"
+        f"{r if len(r)>0 else ''} {r if len(r)>2 else ''} {r if len(r)>5 else ''} {r if len(r)>7 else ''}"
         for r in portfolio_rows
     ])
     targets_rows = sheet_dashboard.get("A19:B21")
-    targets_text = "\n".join([f"{r[0] if len(r)>0 else ''} {r[1] if len(r)>1 else ''}" for r in targets_rows])
+    targets_text = "\n".join([f"{r if len(r)>0 else ''} {r if len(r)>1 else ''}" for r in targets_rows])
 
     feed = feedparser.parse(config.RSS_NEWS_URL)
     news_text = "\n".join([entry.title for entry in feed.entries[:7]])
