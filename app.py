@@ -48,19 +48,13 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-# ================= شريط الأسعار الحية =================
 try:
     ounce, ch, chp, buy_24k, sell_24k = services.get_live_gold()
     if ounce > 0:
         sheet_dashboard.update_acell("C5", ounce)
 
     ch_color = "#00B87A" if ch >= 0 else "#F6465D"
-    st.markdown(f"""
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; direction:rtl;">
-        <div><span class="gold-badge">🪙 GOLD 24K • دار السبائك</span></div>
-        <div style="font-size:0.85rem; font-weight:700; color:#1E2329;">الأونصة: ${ounce:,.2f} <span style="color:{ch_color};">({ch:+.2f}$)</span></div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f'<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; direction:rtl;"><div><span class="gold-badge">🪙 GOLD 24K • دار السبائك</span></div><div style="font-size:0.85rem; font-weight:700; color:#1E2329;">الأونصة: ${ounce:,.2f} <span style="color:{ch_color};">({ch:+.2f}$)</span></div></div>', unsafe_allow_html=True)
 
     b1, b2 = st.columns(2)
     with b1:
@@ -92,12 +86,10 @@ except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
 st.write("")
-# ================= شريط التنقل بين الشاشات (يعمل 100% على جميع هواتف الأندرويد) =================
 nav_options = ["📊 الشارت", "🎯 القنص AI", "🧮 الحاسبة", "➕ صفقة", "📜 السجل"]
 selected_page = st.radio("القائمة", nav_options, horizontal=True, label_visibility="collapsed")
 st.divider()
 
-# ================= 1. شاشة الشارت والمحفظة =================
 if selected_page == "📊 الشارت":
     tf_code = st.radio("Timeframe", ["15M", "1H", "4H", "1D", "1W"], index=3, horizontal=True, label_visibility="collapsed")
 
@@ -106,41 +98,14 @@ if selected_page == "📊 الشارت":
         last_row = df_chart.iloc[-1]
         last_dt = df_chart.index[-1].strftime("%Y-%m-%d %H:%M")
 
-        st.markdown(f"""
-        <div class="ohlc-bar">
-            <span><b>{last_dt}</b></span>
-            <span>O: <b>{last_row['Open']:.3f}</b></span>
-            <span>H: <b>{last_row['High']:.3f}</b></span>
-            <span>L: <b>{last_row['Low']:.3f}</b></span>
-            <span>C: <b>{last_row['Close']:.3f}</b></span>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="ohlc-bar"><span><b>{last_dt}</b></span><span>O: <b>{last_row["Open"]:.3f}</b></span><span>H: <b>{last_row["High"]:.3f}</b></span><span>L: <b>{last_row["Low"]:.3f}</b></span><span>C: <b>{last_row["Close"]:.3f}</b></span></div>', unsafe_allow_html=True)
 
         fig = go.Figure()
-        fig.add_trace(go.Candlestick(
-            x=df_chart.index,
-            open=df_chart["Open"],
-            high=df_chart["High"],
-            low=df_chart["Low"],
-            close=df_chart["Close"],
-            increasing_line_color="#00B87A",
-            increasing_fillcolor="#00B87A",
-            decreasing_line_color="#F6465D",
-            decreasing_fillcolor="#F6465D",
-            name="سعر الجرام"
-        ))
+        fig.add_trace(go.Candlestick(x=df_chart.index, open=df_chart["Open"], high=df_chart["High"], low=df_chart["Low"], close=df_chart["Close"], increasing_line_color="#00B87A", increasing_fillcolor="#00B87A", decreasing_line_color="#F6465D", decreasing_fillcolor="#F6465D", name="سعر الجرام"))
 
         hammers = df_chart[df_chart["Hammer"] == True]
         if not hammers.empty:
-            fig.add_trace(go.Scatter(
-                x=hammers.index,
-                y=hammers["Low"] - 0.12,
-                mode="markers+text",
-                text="🔨",
-                textposition="bottom center",
-                marker=dict(symbol="diamond", size=8, color="#FCD535", line=dict(width=1, color="#1E2329")),
-                name="مطرقة"
-            ))
+            fig.add_trace(go.Scatter(x=hammers.index, y=hammers["Low"] - 0.12, mode="markers+text", text="🔨", textposition="bottom center", marker=dict(symbol="diamond", size=8, color="#FCD535", line=dict(width=1, color="#1E2329")), name="مطرقة"))
 
         if buy_24k > 0:
             fig.add_hline(y=buy_24k, line_dash="dot", line_color="#00B87A", line_width=1.2, annotation_text=f" {buy_24k:.3f} ", annotation_bgcolor="#00B87A", annotation_font_color="#FFFFFF", annotation_position="right")
@@ -156,18 +121,7 @@ if selected_page == "📊 الشارت":
 
         bull_pct = int(min(max(last_rsi, 15), 85))
         bear_pct = 100 - bull_pct
-        st.markdown(f"""
-        <div style="margin-top:4px; margin-bottom:12px; direction:rtl;">
-            <div style="display:flex; justify-content:space-between; font-size:0.78rem; font-weight:800; margin-bottom:3px;">
-                <span style="color:#00B87A;">🐂 المشترون {bull_pct}%</span>
-                <span style="color:#707A8A;">معنويات السوق (SENTIMENT)</span>
-                <span style="color:#F6465D;">{bear_pct}% البائعون 🐻</span>
-            </div>
-            <div style="width:100%; height:7px; background-color:#F6465D; border-radius:5px; overflow:hidden;">
-                <div style="width:{bull_pct}%; height:100%; background-color:#00B87A;"></div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div style="margin-top:4px; margin-bottom:12px; direction:rtl;"><div style="display:flex; justify-content:space-between; font-size:0.78rem; font-weight:800; margin-bottom:3px;"><span style="color:#00B87A;">🐂 المشترون {bull_pct}%</span><span style="color:#707A8A;">معنويات السوق (SENTIMENT)</span><span style="color:#F6465D;">{bear_pct}% البائعون 🐻</span></div><div style="width:100%; height:7px; background-color:#F6465D; border-radius:5px; overflow:hidden;"><div style="width:{bull_pct}%; height:100%; background-color:#00B87A;"></div></div></div>', unsafe_allow_html=True)
     except Exception as e:
         st.caption(f"جاري تحميل الشارت... ({e})")
 
@@ -186,8 +140,19 @@ if selected_page == "📊 الشارت":
     if st.button("🔄 تحديث الأسعار والبيانات"):
         st.rerun()
 
-# ================= 2. شاشة القنص الذكي والمستشار AI =================
 elif selected_page == "🎯 القنص AI":
     st.markdown("<h4 class='rtl-box'>🎯 أفضل 3 مناطق شراء مقترحة</h4>", unsafe_allow_html=True)
     st.markdown("<p class='rtl-box' style='color:#707A8A; font-size:0.85rem;'>تحليل فني + الأخبار الحية لتحديد نقاط تعزيز محفظتك.</p>", unsafe_allow_html=True)
     if st.button("🔍 استخرج مناطق القنص الآن"):
+        with st.spinner("جاري تحليل الشارت والأخبار..."):
+            zones = services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams)
+            st.markdown(f'<div class="rtl-box" style="background:#F8F9FA; padding:14px; border-radius:10px; border:1px solid #EAECEF;">{zones}</div>', unsafe_allow_html=True)
+
+    st.divider()
+    st.markdown("<h4 class='rtl-box'>🤖 اسأل المستشار الذكي</h4>", unsafe_allow_html=True)
+    user_q = st.text_input("اكتب سؤالك هنا:", placeholder="مثال: شنو يصير لو شريت 20 جرام الحين؟")
+    if st.button("💡 تحليل وإجابة"):
+        if user_q:
+            with st.spinner("جاري الحساب..."):
+                portfolio_rows = sheet_dashboard.get("A13:I16")
+                answer = services.ask_ai_advisor(user_q, ounce, buy_24k, sell_24k, portfolio_rows)
