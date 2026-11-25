@@ -1,25 +1,36 @@
 import streamlit as st
 from datetime import datetime
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import config
 import services
 
-st.set_page_config(page_title="دار السبائك AI Pro", page_icon="🪙", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="دار السبائك Trading Desk", page_icon="🪙", layout="centered", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
-    .main { direction: rtl; text-align: right; background-color: #0E1117; }
+    .main, .stApp { direction: rtl; text-align: right; background-color: #FFFFFF !important; color: #1E2329 !important; }
     header[data-testid="stHeader"], footer { display: none !important; }
-    .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 650px; }
-    .kpi-card { background: linear-gradient(145deg, #1A1F2C, #141821); border: 1px solid #2A3142; border-radius: 14px; padding: 12px 10px; text-align: center; margin-bottom: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
-    .kpi-title { color: #9BA3B4; font-size: 0.75rem; margin-bottom: 3px; font-weight: 500; }
-    .kpi-value { color: #FFFFFF; font-size: 1.2rem; font-weight: 700; }
-    .kpi-gold { color: #F5C542; font-size: 1.2rem; font-weight: 700; }
-    .kpi-sub-up { color: #00E676; font-size: 0.72rem; font-weight: 600; }
-    .kpi-sub-down { color: #FF5252; font-size: 0.72rem; font-weight: 600; }
-    .stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: 700; border: 1px solid #F5C54244; }
-    button[data-baseweb="tab"] { font-size: 0.85rem !important; padding: 8px 10px !important; font-weight: 600 !important; }
+    .block-container { padding-top: 0.8rem !important; padding-bottom: 2rem !important; max-width: 680px; }
+
+    /* بطاقات البيع والشراء المزدوجة مثل المنصة في الصورة */
+    .trade-box-sell { background-color: #FFF2F4; border: 1px solid #FAD1D8; border-radius: 10px; padding: 10px; text-align: center; }
+    .trade-box-buy { background-color: #EBF9F4; border: 1px solid #C2EEDF; border-radius: 10px; padding: 10px; text-align: center; }
+    .sell-label { color: #F6465D; font-size: 0.8rem; font-weight: 700; }
+    .sell-price { color: #F6465D; font-size: 1.25rem; font-weight: 800; }
+    .buy-label { color: #00B87A; font-size: 0.8rem; font-weight: 700; }
+    .buy-price { color: #00B87A; font-size: 1.25rem; font-weight: 800; }
+
+    /* بطاقات المحفظة البيضاء النظيفة */
+    .light-card { background-color: #F8F9FA; border: 1px solid #EAECEF; border-radius: 12px; padding: 10px 12px; text-align: center; margin-bottom: 8px; }
+    .light-title { color: #707A8A; font-size: 0.74rem; margin-bottom: 2px; font-weight: 600; }
+    .light-val { color: #1E2329; font-size: 1.15rem; font-weight: 800; }
+    .gold-badge { background-color: #FEF6D8; color: #C99400; padding: 3px 10px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; }
+
+    /* شريط بيانات OHLC أعلى الشارت */
+    .ohlc-bar { background-color: #F8F9FA; border: 1px solid #EAECEF; border-radius: 8px; padding: 6px 10px; font-size: 0.75rem; color: #474D57; display: flex; justify-content: space-between; margin-bottom: 6px; direction: ltr; }
+
+    .stButton>button { width: 100%; border-radius: 10px; height: 3em; font-weight: 700; background-color: #FCD535 !important; color: #1E2329 !important; border: none !important; }
+    button[data-baseweb="tab"] { font-size: 0.85rem !important; font-weight: 700 !important; color: #474D57 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -35,9 +46,9 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.markdown("<h2 style='text-align:center; color:#F5C542; margin-top:2rem;'>🪙 دار السبائك AI</h2>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align:center; color:#1E2329; margin-top:2rem;'>🪙 دار السبائك Trading Desk</h3>", unsafe_allow_html=True)
     pin_input = st.text_input("الرقم السري", type="password", max_chars=8, placeholder="أدخل رمز الدخول...")
-    if st.button("🔓 فتح المحفظة"):
+    if st.button("دخول المنصة"):
         if pin_input == str(APP_PIN):
             st.session_state.authenticated = True
             st.rerun()
@@ -45,24 +56,28 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-st.markdown("<h3 style='text-align:center; color:#F5C542; margin-bottom:0.6rem;'>🪙 محفظة دار السبائك AI</h3>", unsafe_allow_html=True)
-
+# ================= شريط الترويسة وبطاقتي البيع والشراء =================
 try:
     ounce, ch, chp, buy_24k, sell_24k = services.get_live_gold()
     if ounce > 0:
         sheet_dashboard.update_acell("C5", ounce)
 
-    ch_class = "kpi-sub-up" if ch >= 0 else "kpi-sub-down"
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(f'<div class="kpi-card"><div class="kpi-title">الأونصة ($)</div><div class="kpi-value">{ounce:,.1f}</div><div class="{ch_class}">{ch:+.2f}$ ({chp:+.1f}%)</div></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<div class="kpi-card"><div class="kpi-title">شراء 24 (د.ك)</div><div class="kpi-gold">{buy_24k:.3f}</div><div class="kpi-title" style="margin:0;">سعر دار السبائك</div></div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown(f'<div class="kpi-card"><div class="kpi-title">بيع 24 (د.ك)</div><div class="kpi-value">{sell_24k:.3f}</div><div class="kpi-title" style="margin:0;">صافي البيع</div></div>', unsafe_allow_html=True)
+    ch_color = "#00B87A" if ch >= 0 else "#F6465D"
+    st.markdown(f"""
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div><span class="gold-badge">🪙 GOLD 24K • دار السبائك</span></div>
+        <div style="font-size:0.85rem; font-weight:700; color:#1E2329;">الأونصة: ${ounce:,.2f} <span style="color:{ch_color};">({ch:+.2f}$)</span></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    b1, b2 = st.columns(2)
+    with b1:
+        st.markdown(f'<div class="trade-box-buy"><div class="buy-label">شراء جرام 24 (Buy)</div><div class="buy-price">{buy_24k:.3f} د.ك</div></div>', unsafe_allow_html=True)
+    with b2:
+        st.markdown(f'<div class="trade-box-sell"><div class="sell-label">بيع جرام 24 (Sell)</div><div class="sell-price">{sell_24k:.3f} د.ك</div></div>', unsafe_allow_html=True)
 except Exception as e:
     ounce, buy_24k, sell_24k = 0, 0, 0
-    st.warning(f"تعذر تحديث السعر الحي: {e}")
+    st.warning(f"تنبيه السعر الحي: {e}")
 
 try:
     eco_alerts = services.get_economic_radar()
@@ -84,34 +99,45 @@ try:
 except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 المحفظة", "🎯 القنص AI", "🧮 الحاسبة", "➕ صفقة", "📜 السجل"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Trading Chart", "🎯 القنص AI", "🧮 الحاسبة", "➕ صفقة", "📜 السجل"])
 
 with tab1:
-    r1c1, r1c2 = st.columns(2)
-    with r1c1:
-        st.markdown(f'<div class="kpi-card"><div class="kpi-title">رصيد الذهب المحتفظ به</div><div class="kpi-gold">{gold_balance_str} جم</div></div>', unsafe_allow_html=True)
-    with r1c2:
-        st.markdown(f'<div class="kpi-card"><div class="kpi-title">متوسط التكلفة (نقطة التعادل)</div><div class="kpi-value">{avg_cost_str} د.ك</div></div>', unsafe_allow_html=True)
-
-    r2c1, r2c2 = st.columns(2)
-    with r2c1:
-        st.markdown(f'<div class="kpi-card"><div class="kpi-title">إجمالي التكلفة المستثمرة</div><div class="kpi-value">{total_cost_str} د.ك</div></div>', unsafe_allow_html=True)
-    with r2c2:
-        st.markdown(f'<div class="kpi-card"><div class="kpi-title">القيمة السوقية الحالية</div><div class="kpi-value">{market_val_str}</div></div>', unsafe_allow_html=True)
-
-    tf_choice = st.radio("الإطار الزمني:", ["يومي (1D)", "ساعي (1H)"], horizontal=True)
-    tf_code = "1H" if "1H" in tf_choice else "1D"
+    # أزرار الأطر الزمنية المتعددة تماماً مثل الصورة (15M, 1H, 4H, 1D, 1W)
+    tf_code = st.radio("Timeframe", ["15M", "1H", "4H", "1D", "1W"], index=3, horizontal=True, label_visibility="collapsed")
 
     try:
-        df_chart, _ = services.get_pro_chart_data(tf_code)
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=(0.76, 0.24))
+        df_chart, _, last_rsi = services.get_pro_chart_data(tf_code)
+        last_row = df_chart.iloc[-1]
+        last_dt = df_chart.index[-1].strftime("%Y-%m-%d %H:%M")
 
-        fig.add_trace(go.Candlestick(x=df_chart.index, open=df_chart["Open"], high=df_chart["High"], low=df_chart["Low"], close=df_chart["Close"], increasing_line_color="#00E676", increasing_fillcolor="#00E676", decreasing_line_color="#FF5252", decreasing_fillcolor="#FF5252", name="السعر"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart["EMA9"], line=dict(color="#F5C542", width=1.6), name="زخم EMA9"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart["UpperBB"], line=dict(color="rgba(100,181,246,0.25)", width=1), showlegend=False), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart["LowerBB"], line=dict(color="rgba(100,181,246,0.35)", width=1), fill="tonexty", fillcolor="rgba(100,181,246,0.06)", name="بولينجر"), row=1, col=1)
+        # شريط بيانات الشمعة الأخيرة (Date, Open, High, Low, Close)
+        st.markdown(f"""
+        <div class="ohlc-bar">
+            <span><b>{last_dt}</b></span>
+            <span>O: <b>{last_row['Open']:.3f}</b></span>
+            <span>H: <b>{last_row['High']:.3f}</b></span>
+            <span>L: <b>{last_row['Low']:.3f}</b></span>
+            <span>C: <b>{last_row['Close']:.3f}</b></span>
+        </div>
+        """, unsafe_allow_html=True)
 
-        # رسم علامات الماس الذهبية تحت شمعات المطرقة المكتشفة تلقائياً
+        fig = go.Figure()
+
+        # 1. الشموع اليابانية النظيفة بألوان المنصة (أخضر زمردي وأحمر)
+        fig.add_trace(go.Candlestick(
+            x=df_chart.index,
+            open=df_chart["Open"],
+            high=df_chart["High"],
+            low=df_chart["Low"],
+            close=df_chart["Close"],
+            increasing_line_color="#00B87A",
+            increasing_fillcolor="#00B87A",
+            decreasing_line_color="#F6465D",
+            decreasing_fillcolor="#F6465D",
+            name="سعر الجرام"
+        ))
+
+        # 2. علامات شمعات المطرقة المكتشفة تلقائياً
         hammers = df_chart[df_chart["Hammer"] == True]
         if not hammers.empty:
             fig.add_trace(go.Scatter(
@@ -120,64 +146,74 @@ with tab1:
                 mode="markers+text",
                 text="🔨",
                 textposition="bottom center",
-                marker=dict(symbol="diamond", size=9, color="#FFD54F", line=dict(width=1, color="#00E676")),
+                marker=dict(symbol="diamond", size=8, color="#FCD535", line=dict(width=1, color="#1E2329")),
                 name="مطرقة"
-            ), row=1, col=1)
+            ))
 
+        # 3. خط السعر الحالي المتقطع (مثل الخط الأخضر المتقطع في الصورة)
+        if buy_24k > 0:
+            fig.add_hline(
+                y=buy_24k,
+                line_dash="dot",
+                line_color="#00B87A",
+                line_width=1.2,
+                annotation_text=f" {buy_24k:.3f} ",
+                annotation_bgcolor="#00B87A",
+                annotation_font_color="#FFFFFF",
+                annotation_position="right"
+            )
+
+        # 4. خط متوسط تكلفتك (نقطة التعادل) باللون الرمادي الداكن مثل مربع السعر في الصورة
         if curr_avg > 0:
-            fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FF5252", line_width=1.5, annotation_text=f"متوسطك {curr_avg:.3f}", annotation_font_color="#FF8A80", annotation_position="top left", row=1, col=1)
+            fig.add_hline(
+                y=curr_avg,
+                line_dash="dash",
+                line_color="#474D57",
+                line_width=1.3,
+                annotation_text=f" متوسطك {curr_avg:.3f} ",
+                annotation_bgcolor="#474D57",
+                annotation_font_color="#FFFFFF",
+                annotation_position="right"
+            )
 
-        if tf_code == "1D":
-            log_rows = sheet_log.get_all_values()
-            buy_dates, buy_prices = [], []
-            chart_start = df_chart.index.min().strftime("%Y-%m-%d")
-            for r in log_rows:
-                if len(r) >= 4:
-                    it = iter(r)
-                    op_date = str(next(it, ""))
-                    op_type_val = str(next(it, ""))
-                    op_price_val = str(next(it, ""))
-                    if "شراء" in op_type_val and op_date >= chart_start:
-                        try:
-                            p_float = float(op_price_val)
-                            if p_float > 10.0:
-                                buy_dates.append(op_date)
-                                buy_prices.append(p_float)
-                        except ValueError:
-                            pass
-
-            if buy_dates:
-                fig.add_trace(go.Scatter(x=buy_dates, y=buy_prices, mode="markers", marker=dict(symbol="triangle-up", size=11, color="#00E676"), name="صفقاتك"), row=1, col=1)
-
-        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart["RSI"], line=dict(color="#BA68C8", width=1.6), showlegend=False), row=2, col=1)
-        fig.add_hline(y=70, line_dash="dot", line_color="rgba(255,82,82,0.5)", row=2, col=1)
-        fig.add_hline(y=30, line_dash="dot", line_color="rgba(0,230,118,0.5)", row=2, col=1)
-
-        fig.update_layout(template="plotly_dark", paper_bgcolor="#141821", plot_bgcolor="#141821", xaxis_rangeslider_visible=False, dragmode=False, height=440, margin=dict(l=8, r=8, t=35, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5, font=dict(size=10, color="#E0E6ED")))
-        fig.update_xaxes(showgrid=True, gridcolor="#1F2636")
-        fig.update_yaxes(showgrid=True, gridcolor="#1F2636", side="right", row=1, col=1)
-        fig.update_yaxes(showgrid=True, gridcolor="#1F2636", side="right", range=(0, 100), tickvals=(30, 70), row=2, col=1)
+        fig.update_layout(
+            template="plotly_white",
+            paper_bgcolor="#FFFFFF",
+            plot_bgcolor="#FFFFFF",
+            xaxis_rangeslider_visible=False,
+            dragmode=False,
+            height=340,
+            margin=dict(l=5, r=55, t=10, b=10),
+            showlegend=False
+        )
+        fig.update_xaxes(showgrid=True, gridcolor="#F0F2F5", linecolor="#EAECEF")
+        fig.update_yaxes(showgrid=True, gridcolor="#F0F2F5", linecolor="#EAECEF", side="right")
 
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+        # شريط معنويات السوق (Sentiment Bar: الثور الأخضر مقابل الدب الأحمر) مثل أسفل يمين الصورة
+        bull_pct = int(min(max(last_rsi, 15), 85))
+        bear_pct = 100 - bull_pct
+        st.markdown(f"""
+        <div style="margin-top:4px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.78rem; font-weight:800; margin-bottom:3px;">
+                <span style="color:#00B87A;">🐂 المشترون {bull_pct}%</span>
+                <span style="color:#707A8A;">معنويات السوق (SENTIMENT)</span>
+                <span style="color:#F6465D;">{bear_pct}% البائعون 🐻</span>
+            </div>
+            <div style="width:100%; height:7px; background-color:#F6465D; border-radius:5px; overflow:hidden;">
+                <div style="width:{bull_pct}%; height:100%; background-color:#00B87A;"></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     except Exception as e:
         st.caption(f"جاري تحميل الشارت... ({e})")
 
-    if st.button("🔄 تحديث البيانات والأسعار"):
-        st.rerun()
+    # بطاقات المحفظة الأربعة أسفل الشارت بتصميم نظيف
+    r1c1, r1c2 = st.columns(2)
+    with r1c1:
+        st.markdown(f'<div class="light-card"><div class="light-title">رصيد الذهب</div><div class="light-val">{gold_balance_str} جم</div></div>', unsafe_allow_html=True)
+    with r1c2:
+        st.markdown(f'<div class="light-card"><div class="light-title">متوسط التكلفة</div><div class="light-val">{avg_cost_str} د.ك</div></div>', unsafe_allow_html=True)
 
-with tab2:
-    st.markdown("#### 🎯 أفضل 3 مناطق شراء مقترحة")
-    st.caption("تحليل فني + الأخبار الحية لتحديد نقاط تعزيز محفظتك.")
-    if st.button("🔍 استخرج مناطق القنص الآن"):
-        with st.spinner("جاري تحليل الشارت والأخبار..."):
-            zones = services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams)
-            st.info(zones)
-
-    st.divider()
-    st.markdown("#### 🤖 اسأل المستشار الذكي")
-    user_q = st.text_input("سؤالك:", placeholder="مثال: شنو يصير لو شريت 20 جرام الحين؟")
-    if st.button("💡 تحليل وإجابة"):
-        if user_q:
-            with st.spinner("جاري الحساب..."):
-                portfolio_rows = sheet_dashboard.get("A13:I16")
-                answer = services.ask_ai_advisor(user_q, ounce, buy_24k, sell_24k, portfolio_rows)
