@@ -52,14 +52,28 @@ def get_pro_chart_data(timeframe="1D"):
     df["UpperBB"] = (df["SMA20"] + (std20 * 2)).round(3)
     df["LowerBB"] = (df["SMA20"] - (std20 * 2)).round(3)
 
-    # حساب مؤشر القوة النسبية RSI (14) لكل شمعة للرسم البياني
+    # حساب مؤشر القوة النسبية RSI (14)
     delta = df["Close"].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     df["RSI"] = (100 - (100 / (1 + rs))).round(1)
 
-    # ملخص المؤشرات الفنية للذكاء الاصطناعي
+    # خوارزمية اكتشاف شمعات المطرقة (Hammer) والمطرقة المقلوبة (Inverted Hammer)
+    body = (df["Close"] - df["Open"]).abs()
+    upper_wick = df["High"] - df[["Open", "Close"]].max(axis=1)
+    lower_wick = df[["Open", "Close"]].min(axis=1) - df["Low"]
+    total_range = df["High"] - df["Low"]
+
+    # شروط المطرقة القياسية: ذيل سفلي >= ضعف الجسم، ذيل علوي صغير، وحجم شمعة ملموس
+    is_hammer = (
+        (total_range > 0) &
+        (lower_wick >= 2.0 * body) &
+        (upper_wick <= 0.35 * body) &
+        (body >= 0.015)
+    )
+    df["Hammer"] = is_hammer
+
     high_period = round(float(hist["High"].tail(30).max()), 2)
     low_period = round(float(hist["Low"].tail(30).min()), 2)
     sma_20_usd = round(float(hist["Close"].tail(20).mean()), 2)
