@@ -8,16 +8,18 @@ from google import genai
 import yfinance as yf
 import config
 
-# قراءة المفاتيح من GitHub Secrets
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"].strip()
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "").strip()
+# قراءة المفاتيح وتنظيفها تلقائياً
+GEMINI_API_KEY = os.environ["GEMINI_API_KEY"].strip().strip('"').strip("'")
+RAW_TG_TOKEN = os.environ.get("TELEGRAM_TOKEN", "").strip().strip('"').strip("'")
+# تنظيف التوكن في حال تم إدخال الرابط الكامل أو كلمة bot بالخطأ
+TELEGRAM_TOKEN = RAW_TG_TOKEN.replace("https://telegram.org", "").replace("bot", "", 1) if RAW_TG_TOKEN.startswith(("http", "bot")) else RAW_TG_TOKEN
+
 GOOGLE_CREDENTIALS = os.environ["GOOGLE_CREDENTIALS"]
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "semsem_gold_kw_99").strip()
 
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 def call_gemini_safe(prompt):
-    # استخدام أحدث نموذج معتمد + جلب النماذج المتاحة تلقائياً من حسابك
     models_to_try = ["gemini-3.8-flash", "gemini-3-flash-preview", "gemini-2.5-flash"]
     try:
         for m in ai_client.models.list():
@@ -38,24 +40,36 @@ def call_gemini_safe(prompt):
     raise RuntimeError(f"All Gemini models failed. Last error: {last_err}")
 
 def send_all_channels(title, html_message, is_urgent=False):
-    if TELEGRAM_TOKEN:
-        tg_url = f"https://telegram.org{TELEGRAM_TOKEN}/sendMessage"
-        requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": html_message, "parse_mode": "HTML"}, timeout=15)
+    # 1. تيليجرام (مع حماية ضد أي خطأ في التوكن)
+    if TELEGRAM_TOKEN and ":" in TELEGRAM_TOKEN:
+        try:
+            tg_url = f"https://telegram.org{TELEGRAM_TOKEN}/sendMessage"
+            requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": html_message, "parse_mode": "HTML"}, timeout=15)
+        except Exception as e:
+            print(f"Telegram warning: {e}")
 
-    clean_text = html_message.replace("<b>", "*").replace("</b>", "*")
-    wa_url = f"https://callmebot.com{config.WHATSAPP_PHONE}&apikey={config.WHATSAPP_APIKEY}&text={requests.utils.quote(clean_text[:950])}"
-    requests.get(wa_url, timeout=15)
+    # 2. واتساب (CallMeBot)
+    try:
+        clean_text = html_message.replace("<b>", "*").replace("</b>", "*")
+        wa_url = f"https://callmebot.com{config.WHATSAPP_PHONE}&apikey={config.WHATSAPP_APIKEY}&text={requests.utils.quote(clean_text[:950])}"
+        requests.get(wa_url, timeout=15)
+    except Exception as e:
+        print(f"WhatsApp warning: {e}")
 
+    # 3. إشعار منبثق للأندرويد (ntfy)
     if NTFY_TOPIC:
-        plain_text = html_message.replace("<b>", "").replace("</b>", "")
-        priority = "urgent" if is_urgent else "high"
-        tags = "rotating_light,chart_with_upwards_trend" if is_urgent else "coin"
-        requests.post(
-            f"https://ntfy.sh{NTFY_TOPIC}",
-            data=plain_text.encode("utf-8"),
-            headers={"Title": title.encode("utf-8"), "Priority": priority, "Tags": tags},
-            timeout=15
-        )
+        try:
+            plain_text = html_message.replace("<b>", "").replace("</b>", "")
+            priority = "urgent" if is_urgent else "high"
+            tags = "rotating_light,chart_with_upwards_trend" if is_urgent else "coin"
+            requests.post(
+                f"https://ntfy.sh{NTFY_TOPIC}",
+                data=plain_text.encode("utf-8"),
+                headers={"Title": title.encode("utf-8"), "Priority": priority, "Tags": tags},
+                timeout=15
+            )
+        except Exception as e:
+            print(f"ntfy warning: {e}")
 
 def run_quarter_hourly_monitor():
     creds_dict = json.loads(GOOGLE_CREDENTIALS)
