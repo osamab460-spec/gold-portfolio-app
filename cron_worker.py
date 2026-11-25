@@ -15,7 +15,7 @@ SCHEME = "https:" + SLASH + SLASH
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"].strip().strip('"').strip("'")
 RAW_TG_TOKEN = os.environ.get("TELEGRAM_TOKEN", "").strip().strip('"').strip("'")
 if "bot" in RAW_TG_TOKEN and SLASH in RAW_TG_TOKEN:
-    TELEGRAM_TOKEN = RAW_TG_TOKEN.split("bot")[-1].split(SLASH)[0]
+    TELEGRAM_TOKEN = RAW_TG_TOKEN.split("bot")[-1].split(SLASH)
 else:
     TELEGRAM_TOKEN = RAW_TG_TOKEN
 
@@ -45,7 +45,6 @@ def call_gemini_safe(prompt):
     raise RuntimeError(f"All Gemini models failed. Last error: {last_err}")
 
 def send_all_channels(title, html_message, is_urgent=False):
-    # 1. تيليجرام
     if TELEGRAM_TOKEN and ":" in TELEGRAM_TOKEN:
         try:
             tg_url = SCHEME + "api.telegram.org" + SLASH + "bot" + TELEGRAM_TOKEN + SLASH + "sendMessage"
@@ -53,7 +52,6 @@ def send_all_channels(title, html_message, is_urgent=False):
         except Exception as e:
             print("Telegram warning:", e)
 
-    # 2. واتساب (CallMeBot)
     try:
         clean_text = html_message.replace("<b>", "*").replace("</b>", "*")
         encoded_text = urllib.parse.quote(clean_text[:950])
@@ -62,7 +60,6 @@ def send_all_channels(title, html_message, is_urgent=False):
     except Exception as e:
         print("WhatsApp warning:", e)
 
-    # 3. إشعارات الأندرويد الفورية (ntfy)
     if NTFY_TOPIC:
         try:
             plain_text = html_message.replace("<b>", "").replace("</b>", "")
@@ -84,12 +81,13 @@ def run_smart_monitor():
     sh = gc.open_by_key(config.SPREADSHEET_ID)
     sheet_dashboard = sh.worksheet(config.SHEET_DASHBOARD_NAME)
 
+    # قراءة السعر اللحظي بدقة الدقيقة الواحدة (1m) لاكتشاف أي حركة سريعة في أقل من 15 دقيقة
     ticker = yf.Ticker("GC=F")
-    hist_15m = ticker.history(period="1d", interval="15m")
+    hist_1m = ticker.history(period="1d", interval="1m")
     hist_1h = ticker.history(period="2d", interval="1h")
     hist_1d = ticker.history(period="2d")
 
-    ounce = round(float(hist_15m["Close"].iloc[-1]), 2)
+    ounce = round(float(hist_1m["Close"].iloc[-1]), 2)
     prev_day_close = round(float(hist_1d["Close"].iloc[-2]), 2) if len(hist_1d) > 1 else ounce
     ch_day = round(ounce - prev_day_close, 2)
     chp_day = round((ch_day / prev_day_close) * 100, 2) if prev_day_close else 0.0
@@ -101,19 +99,19 @@ def run_smart_monitor():
         sheet_dashboard.update_acell("C5", ounce)
 
     # قراءة خلايا الذاكرة من الإكسل:
-    # N5 = سعر الربع ساعة السابق | K5 = سعر الساعة السابقة | L5 = الاتجاه السابق
+    # N5 = سعر الفحص السابق (قبل 5 دقائق) | K5 = سعر الساعة السابقة | L5 = الاتجاه السابق
     # O5 = سعر آخر تنبيه أُرسل (لمنع تفويت الصعود المتدرج) | P5 = رقم آخر ساعة مفحوصة
     try:
-        last_15m = float(sheet_dashboard.acell("N5").value or ounce)
+        last_step_price = float(sheet_dashboard.acell("N5").value or ounce)
         last_1h = float(sheet_dashboard.acell("K5").value or ounce)
         last_trend = sheet_dashboard.acell("L5").value or "NEUTRAL"
         last_alert_price = float(sheet_dashboard.acell("O5").value or ounce)
         last_checked_hour = str(sheet_dashboard.acell("P5").value or "")
     except Exception:
-        last_15m, last_1h, last_alert_price = ounce, ounce, ounce
+        last_step_price, last_1h, last_alert_price = ounce, ounce, ounce
         last_trend, last_checked_hour = "NEUTRAL", ""
 
-    diff_15m = round(ounce - last_15m, 2)
+    diff_fast = round(ounce - last_step_price, 2)
     diff_1h = round(ounce - last_1h, 2)
     diff_since_last_alert = round(ounce - last_alert_price, 2)
 
@@ -126,24 +124,24 @@ def run_smart_monitor():
 
     alert_header = ""
 
-    # 1. فحص الحركة السريعة (25$ في 15 دقيقة) أو الحركة التراكمية (25$ منذ آخر تنبيه)
-    if diff_15m >= 25.0:
-        alert_header = f"⚡🚀 <b>قفزة صاروخية (15 دقيقة): الذهب ارتفع +{diff_15m}$ في ربع ساعة!</b>"
-    elif diff_15m <= -25.0:
-        alert_header = f"⚡🔻 <b>هبوط عنيف (15 دقيقة): الذهب تراجع {diff_15m}$ في ربع ساعة!</b>"
+    # 1. فحص الحركة الفورية (25$ في دقائق معدودة) أو الحركة التراكمية (25$ منذ آخر تنبيه)
+    if diff_fast >= 25.0:
+        alert_header = f"⚡🚀 <b>قفزة صاروخية فورية: الذهب ارتفع +{diff_fast}$ خلال دقائق!</b>"
+    elif diff_fast <= -25.0:
+        alert_header = f"⚡🔻 <b>هبوط عنيف فوري: الذهب تراجع {diff_fast}$ خلال دقائق!</b>"
     elif diff_since_last_alert >= 25.0:
-        alert_header = f"📈🚀 <b>موجة صعود قوية: الذهب ارتفع +{diff_since_last_alert}$ منذ آخر تنبيه!</b>"
+        alert_header = f"📈🚀 <b>موجة صعود قوية (+{diff_since_last_alert}$): الذهب يواصل الارتفاع منذ آخر تنبيه!</b>"
     elif diff_since_last_alert <= -25.0:
-        alert_header = f"📉🔻 <b>موجة هبوط قوية: الذهب تراجع {diff_since_last_alert}$ منذ آخر تنبيه!</b>"
+        alert_header = f"📉🔻 <b>موجة هبوط قوية ({diff_since_last_alert}$): الذهب يواصل التراجع منذ آخر تنبيه!</b>"
 
-    # 2. فحص الانقلاب الساعي وسلسلة الشموع (يعمل مرة واحدة في كل ساعة جديدة مهما تأخر GitHub)
+    # 2. فحص الانقلاب الساعي وسلسلة الشموع (يعمل مرة واحدة في كل ساعة جديدة)
     sma_12h = round(float(hist_1h["Close"].tail(12).mean()), 2)
     current_trend = "UP" if ounce > sma_12h else "DOWN"
 
-    # فحص 3 شموع ساعية متتالية في نفس الاتجاه
-    last_3_closes = hist_1h["Close"].tail(4).tolist()
-    is_3_green = len(last_3_closes) == 4 and (last_3_closes[3] > last_3_closes[2] > last_3_closes[1] > last_3_closes[0])
-    is_3_red = len(last_3_closes) == 4 and (last_3_closes[3] < last_3_closes[2] < last_3_closes[1] < last_3_closes[0])
+    c_prev2 = float(hist_1h["Close"].iloc[-3]) if len(hist_1h) >= 3 else ounce
+    c_prev1 = float(hist_1h["Close"].iloc[-2]) if len(hist_1h) >= 2 else ounce
+    is_3_green = (ounce > c_prev1) and (c_prev1 > c_prev2) and ((ounce - c_prev2) >= 20.0)
+    is_3_red = (ounce < c_prev1) and (c_prev1 < c_prev2) and ((c_prev2 - ounce) >= 20.0)
 
     is_new_hour = (current_hour_str != last_checked_hour)
     if is_new_hour:
@@ -153,9 +151,9 @@ def run_smart_monitor():
             elif last_trend == "UP" and current_trend == "DOWN":
                 alert_header = "🔄📉 <b>تنبيه انقلاب هبوطي: الذهب يكسر المتوسط الساعي ويتجه للهبوط!</b>"
             elif is_3_green:
-                alert_header = "🟢🚀 <b>زخم صعودي متواصل: 3 شموع خضراء متتالية على فريم الساعة!</b>"
+                alert_header = "🟢🚀 <b>زخم صعودي متواصل: 3 شموع خضراء متتالية بقوة!</b>"
             elif is_3_red:
-                alert_header = "🔴🔻 <b>ضغط بيعي متواصل: 3 شموع حمراء متتالية على فريم الساعة!</b>"
+                alert_header = "🔴🔻 <b>ضغط بيعي متواصل: 3 شموع حمراء متتالية بقوة!</b>"
 
         sheet_dashboard.update_acell("K5", ounce)
         sheet_dashboard.update_acell("L5", current_trend)
@@ -166,7 +164,6 @@ def run_smart_monitor():
     targets_rows = sheet_dashboard.get("A19:B21")
     targets_text = "\n".join([" | ".join(r) for r in targets_rows if r])
 
-    # إرسال التنبيه العاجل وتحديث سعر آخر تنبيه في O5
     if alert_header:
         sheet_dashboard.update_acell("O5", ounce)
         alert_prompt = f"""أنت مستشاري المالي لأسواق الذهب في الكويت (دار السبائك).
