@@ -31,7 +31,17 @@ def get_live_gold():
     return ounce, ch, chp, buy_24k, sell_24k
 
 def _call_gemini_safe(prompt):
-    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    # النماذج الحديثة المعتمدة + جلب المتاح تلقائياً من حسابك
+    models_to_try = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"]
+    
+    try:
+        for m in ai_client.models.list():
+            name = m.name.replace("models/", "")
+            if "flash" in name and name not in models_to_try:
+                models_to_try.append(name)
+    except Exception:
+        pass
+
     last_error = ""
     for model_name in models_to_try:
         try:
