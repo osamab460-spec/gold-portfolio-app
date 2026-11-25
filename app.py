@@ -16,22 +16,22 @@ st.markdown("""
 <style>
     .main { direction: rtl; text-align: right; background-color: #0E1117; }
     header[data-testid="stHeader"], footer { display: none !important; }
-    .block-container { padding-top: 1.2rem !important; padding-bottom: 2rem !important; max-width: 650px; }
+    .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 650px; }
 
     .kpi-card {
         background: linear-gradient(145deg, #1A1F2C, #141821);
         border: 1px solid #2A3142;
         border-radius: 14px;
-        padding: 14px 12px;
+        padding: 12px 10px;
         text-align: center;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.25);
     }
-    .kpi-title { color: #9BA3B4; font-size: 0.78rem; margin-bottom: 4px; font-weight: 500; }
-    .kpi-value { color: #FFFFFF; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.3px; }
-    .kpi-gold { color: #F5C542; font-size: 1.25rem; font-weight: 700; }
-    .kpi-sub-up { color: #00E676; font-size: 0.75rem; font-weight: 600; }
-    .kpi-sub-down { color: #FF5252; font-size: 0.75rem; font-weight: 600; }
+    .kpi-title { color: #9BA3B4; font-size: 0.75rem; margin-bottom: 3px; font-weight: 500; }
+    .kpi-value { color: #FFFFFF; font-size: 1.2rem; font-weight: 700; }
+    .kpi-gold { color: #F5C542; font-size: 1.2rem; font-weight: 700; }
+    .kpi-sub-up { color: #00E676; font-size: 0.72rem; font-weight: 600; }
+    .kpi-sub-down { color: #FF5252; font-size: 0.72rem; font-weight: 600; }
 
     .stButton>button {
         width: 100%;
@@ -71,7 +71,7 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-st.markdown("<h3 style='text-align:center; color:#F5C542; margin-bottom:0.8rem;'>🪙 محفظة دار السبائك AI</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align:center; color:#F5C542; margin-bottom:0.6rem;'>🪙 محفظة دار السبائك AI</h3>", unsafe_allow_html=True)
 
 try:
     ounce, ch, chp, buy_24k, sell_24k = services.get_live_gold()
@@ -162,7 +162,7 @@ with tab1:
             <div class="kpi-value">{market_val_str}</div>
         </div>""", unsafe_allow_html=True)
 
-    tf_choice = st.radio("الإطار الزمني للشموع:", ["يومي (1D)", "ساعي (1H)"], horizontal=True)
+    tf_choice = st.radio("الإطار الزمني:", ["يومي (1D)", "ساعي (1H)"], horizontal=True)
     tf_code = "1H" if "1H" in tf_choice else "1D"
 
     try:
@@ -171,10 +171,11 @@ with tab1:
         fig = make_subplots(
             rows=2, cols=1,
             shared_xaxes=True,
-            vertical_spacing=0.05,
-            row_heights=(0.75, 0.25)
+            vertical_spacing=0.06,
+            row_heights=(0.76, 0.24)
         )
 
+        # 1. الشموع اليابانية بحجم واضح وألوان احترافية
         fig.add_trace(go.Candlestick(
             x=df_chart.index,
             open=df_chart["Open"],
@@ -182,40 +183,47 @@ with tab1:
             low=df_chart["Low"],
             close=df_chart["Close"],
             increasing_line_color="#00E676",
+            increasing_fillcolor="#00E676",
             decreasing_line_color="#FF5252",
-            name="سعر الجرام"
+            decreasing_fillcolor="#FF5252",
+            name="السعر"
         ), row=1, col=1)
 
+        # 2. خط الزخم الذهبي EMA 9
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=df_chart["EMA9"],
-            line=dict(color="#F5C542", width=1.4),
-            name="زخم EMA 9"
+            line=dict(color="#F5C542", width=1.6),
+            name="زخم EMA9"
         ), row=1, col=1)
 
+        # 3. البولينجر باند المظلل
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=df_chart["UpperBB"],
-            line=dict(color="rgba(100, 181, 246, 0.3)", width=1),
-            name="حد علوي BB",
+            line=dict(color="rgba(100, 181, 246, 0.25)", width=1),
             showlegend=False
         ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=df_chart["LowerBB"],
-            line=dict(color="rgba(100, 181, 246, 0.4)", width=1),
+            line=dict(color="rgba(100, 181, 246, 0.35)", width=1),
             fill="tonexty",
-            fillcolor="rgba(100, 181, 246, 0.07)",
-            name="نطاق بولينجر"
+            fillcolor="rgba(100, 181, 246, 0.06)",
+            name="بولينجر"
         ), row=1, col=1)
 
+        # 4. خط متوسط تكلفتك (نقطة التعادل)
         if curr_avg > 0:
             fig.add_hline(
                 y=curr_avg,
                 line_dash="dash",
                 line_color="#FF5252",
-                annotation_text=f"متوسطك: {curr_avg:.3f}",
+                line_width=1.5,
+                annotation_text=f"متوسطك {curr_avg:.3f}",
+                annotation_font_color="#FF8A80",
                 annotation_position="top left",
                 row=1, col=1
             )
 
+        # 5. فلترة صفقات الشراء الحقيقية فقط (أكبر من 10 د.ك) لمنع تشوه مقياس الرسم
         if tf_code == "1D":
             log_rows = sheet_log.get_all_values()
             buy_dates, buy_prices = [], []
@@ -228,8 +236,10 @@ with tab1:
                     op_price_val = str(next(it, ""))
                     if "شراء" in op_type_val and op_date >= chart_start:
                         try:
-                            buy_dates.append(op_date)
-                            buy_prices.append(float(op_price_val))
+                            p_float = float(op_price_val)
+                            if p_float > 10.0:
+                                buy_dates.append(op_date)
+                                buy_prices.append(p_float)
                         except ValueError:
                             pass
 
@@ -237,14 +247,14 @@ with tab1:
                 fig.add_trace(go.Scatter(
                     x=buy_dates, y=buy_prices,
                     mode="markers",
-                    marker=dict(symbol="triangle-up", size=12, color="#00E676", line=dict(width=1, color="#0E1117")),
+                    marker=dict(symbol="triangle-up", size=11, color="#00E676", line=dict(width=1, color="#0E1117")),
                     name="صفقاتك"
                 ), row=1, col=1)
 
+        # 6. مؤشر RSI 14 في اللوحة السفلية
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=df_chart["RSI"],
-            line=dict(color="#BA68C8", width=1.5),
-            name="RSI 14",
+            line=dict(color="#BA68C8", width=1.6),
             showlegend=False
         ), row=2, col=1)
         fig.add_hline(y=70, line_dash="dot", line_color="rgba(255,82,82,0.5)", row=2, col=1)
@@ -252,24 +262,13 @@ with tab1:
 
         fig.update_layout(
             template="plotly_dark",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(26,31,44,0.5)",
+            paper_bgcolor="#141821",
+            plot_bgcolor="#141821",
             xaxis_rangeslider_visible=False,
-            dragmode="pan",
-            height=450,
-            margin=dict(l=5, r=5, t=25, b=5),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
-        )
-        fig.update_yaxes(title_text="د.ك", row=1, col=1)
-        fig.update_yaxes(title_text="RSI", range=(0, 100), row=2, col=1)
-
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True})
-    except Exception as e:
-        st.caption(f"جاري تحميل الشارت المتطور... ({e})")
-
-    if st.button("🔄 تحديث البيانات والأسعار"):
-        st.rerun()
-
-with tab2:
-    st.markdown("#### 🎯 أفضل 3 مناطق شراء مقترحة")
-    st.caption("تحليل فني + الأخبار الحية لتحديد نقاط تعزيز محفظتك.")
+            dragmode=False,
+            height=430,
+            margin=dict(l=8, r=8, t=35, b=10),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.01,
