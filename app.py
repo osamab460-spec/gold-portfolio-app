@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import config
 import services
 
+# ================= 1. إعدادات الصفحة وإخفاء زوائد المتصفح =================
 st.set_page_config(
     page_title="دار السبائك AI Pro",
     page_icon="🪙",
@@ -13,9 +14,41 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .main { direction: rtl; text-align: right; }
-    div[data-testid="stMetricValue"] { font-size: 1.3rem; }
-    .stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: bold; }
+    /* اتجاه عربي نظيف وإخفاء شريط Streamlit العلوي والتذييل */
+    .main { direction: rtl; text-align: right; background-color: #0E1117; }
+    header[data-testid="stHeader"], footer { display: none !important; }
+    .block-container { padding-top: 1.2rem !important; padding-bottom: 2rem !important; max-width: 650px; }
+
+    /* تنسيق البطاقات المالية الاحترافية */
+    .kpi-card {
+        background: linear-gradient(145deg, #1A1F2C, #141821);
+        border: 1px solid #2A3142;
+        border-radius: 14px;
+        padding: 14px 12px;
+        text-align: center;
+        margin-bottom: 10px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+    .kpi-title { color: #9BA3B4; font-size: 0.78rem; margin-bottom: 4px; font-weight: 500; }
+    .kpi-value { color: #FFFFFF; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.3px; }
+    .kpi-gold { color: #F5C542; font-size: 1.25rem; font-weight: 700; }
+    .kpi-sub-up { color: #00E676; font-size: 0.75rem; font-weight: 600; }
+    .kpi-sub-down { color: #FF5252; font-size: 0.75rem; font-weight: 600; }
+
+    /* تحسين شكل الأزرار والتبويبات على الموبايل */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        height: 3.1em;
+        font-weight: 700;
+        border: 1px solid #F5C54244;
+        transition: all 0.2s ease;
+    }
+    button[data-baseweb="tab"] {
+        font-size: 0.85rem !important;
+        padding: 8px 10px !important;
+        font-weight: 600 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -26,14 +59,16 @@ if st.query_params.get("cron") == "run":
     st.success("CRON_OK")
     st.stop()
 
+# ================= 2. شاشة الدخول بالرقم السري =================
 APP_PIN = st.secrets.get("APP_PIN", "1234")
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.title("🔐 محفظة دار السبائك AI Pro")
-    pin_input = st.text_input("أدخل الرقم السري للدخول", type="password", max_chars=8)
-    if st.button("دخول المحفظة"):
+    st.markdown("<h2 style='text-align:center; color:#F5C542; margin-top:2rem;'>🪙 دار السبائك AI</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; color:#9BA3B4; font-size:0.9rem;'>منصة إدارة محفظة الذهب الذكية</p>", unsafe_allow_html=True)
+    pin_input = st.text_input("الرقم السري", type="password", max_chars=8, placeholder="أدخل رمز الدخول...")
+    if st.button("🔓 فتح المحفظة"):
         if pin_input == str(APP_PIN):
             st.session_state.authenticated = True
             st.rerun()
@@ -41,33 +76,52 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-st.title("🪙 محفظة دار السبائك AI Pro")
+# ================= 3. الترويسة وشريط الأسعار الحية المدمج =================
+st.markdown("<h3 style='text-align:center; color:#F5C542; margin-bottom:0.8rem;'>🪙 محفظة دار السبائك AI</h3>", unsafe_allow_html=True)
 
 try:
     ounce, ch, chp, buy_24k, sell_24k = services.get_live_gold()
     if ounce > 0:
         sheet_dashboard.update_acell("C5", ounce)
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("الأونصة ($)", f"{ounce:,.2f}", f"{ch:+.2f}$")
-    col2.metric("شراء 24 (د.ك)", f"{buy_24k:.3f}")
-    col3.metric("بيع 24 (د.ك)", f"{sell_24k:.3f}")
+    ch_class = "kpi-sub-up" if ch >= 0 else "kpi-sub-down"
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">الأونصة ($)</div>
+            <div class="kpi-value">{ounce:,.1f}</div>
+            <div class="{ch_class}">{ch:+.2f}$ ({chp:+.1f}%)</div>
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">شراء 24 (د.ك)</div>
+            <div class="kpi-gold">{buy_24k:.3f}</div>
+            <div class="kpi-title" style="margin:0;">سعر دار السبائك</div>
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">بيع 24 (د.ك)</div>
+            <div class="kpi-value">{sell_24k:.3f}</div>
+            <div class="kpi-title" style="margin:0;">صافي البيع</div>
+        </div>""", unsafe_allow_html=True)
 except Exception as e:
     ounce, buy_24k, sell_24k = 0, 0, 0
-    st.warning(f"تنبيه السعر الحي: {e}")
+    st.warning(f"تعذر تحديث السعر الحي: {e}")
 
+# رادار البيانات الاقتصادية (يظهر بشكل مدمج وأنيق)
 try:
     eco_alerts = services.get_economic_radar()
     if eco_alerts:
-        with st.expander("🛡️ رادار البيانات الاقتصادية الحية (تقلبات متوقعة)", expanded=False):
-            st.caption("تنبيه: وجود أخبار الفيدرالي أو التضخم قد يسبب تذبذباً حاداً (±30$):")
+        with st.expander("🛡️ رادار الأخبار الاقتصادية الحية", expanded=False):
             for item in eco_alerts:
-                st.write(f"• {item}")
+                st.caption(f"• {item}")
 except Exception:
     pass
 
-st.divider()
-
+# قراءة بيانات المحفظة
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 market_val_str = sheet_dashboard.acell("C15").value or "0"
@@ -79,24 +133,46 @@ try:
 except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
+# ================= 4. التبويبات الخمسة النظيفة =================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📊 المحفظة والشارت",
-    "🎯 مناطق الشراء",
-    "🧮 الحاسبة والزكاة",
+    "📊 المحفظة",
+    "🎯 القنص AI",
+    "🧮 الحاسبة",
     "➕ صفقة",
     "📜 السجل"
 ])
 
+# --- التبويب 1: بطاقات المحفظة + الشارت الاحترافي ---
 with tab1:
-    c1, c2 = st.columns(2)
-    c1.metric("رصيد الذهب", f"{gold_balance_str} جم")
-    c2.metric("متوسط التكلفة", f"{avg_cost_str} د.ك")
+    r1c1, r1c2 = st.columns(2)
+    with r1c1:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">رصيد الذهب المحتفظ به</div>
+            <div class="kpi-gold">{gold_balance_str} جم</div>
+        </div>""", unsafe_allow_html=True)
+    with r1c2:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">متوسط التكلفة (نقطة التعادل)</div>
+            <div class="kpi-value">{avg_cost_str} د.ك</div>
+        </div>""", unsafe_allow_html=True)
 
-    c3, c4 = st.columns(2)
-    c3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
-    c4.metric("القيمة السوقية", f"{market_val_str}")
+    r2c1, r2c2 = st.columns(2)
+    with r2c1:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">إجمالي التكلفة المستثمرة</div>
+            <div class="kpi-value">{total_cost_str} د.ك</div>
+        </div>""", unsafe_allow_html=True)
+    with r2c2:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">القيمة السوقية الحالية</div>
+            <div class="kpi-value">{market_val_str}</div>
+        </div>""", unsafe_allow_html=True)
 
-    st.subheader("🕯️ شارت جرام 24 الاحترافي (30 يوماً)")
+    st.markdown("<div style='margin-top:8px; font-weight:700; color:#E0E6ED;'>🕯️ حركة جرام 24 (آخر 30 يوماً)</div>", unsafe_allow_html=True)
     try:
         df_chart, _ = services.get_pro_chart_data()
         fig = go.Figure()
@@ -107,26 +183,21 @@ with tab1:
             high=df_chart["High"],
             low=df_chart["Low"],
             close=df_chart["Close"],
-            name="سعر الجرام (د.ك)"
+            name="سعر الجرام"
         ))
 
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=df_chart["LowerBB"],
-            line=dict(color="rgba(0, 200, 100, 0.5)", width=1, dash="dot"),
-            name="منطقة تشبع بيعي (دعم)"
-        ))
-        fig.add_trace(go.Scatter(
-            x=df_chart.index, y=df_chart["UpperBB"],
-            line=dict(color="rgba(255, 165, 0, 0.5)", width=1, dash="dot"),
-            name="منطقة تشبع شرائي (مقاومة)"
+            line=dict(color="rgba(0, 230, 118, 0.45)", width=1, dash="dot"),
+            name="دعم (تشبع بيعي)"
         ))
 
         if curr_avg > 0:
             fig.add_hline(
                 y=curr_avg,
                 line_dash="dash",
-                line_color="red",
-                annotation_text=f"متوسط تكلفتك: {curr_avg:.3f} د.ك",
+                line_color="#FF5252",
+                annotation_text=f"متوسطك: {curr_avg:.3f}",
                 annotation_position="top left"
             )
 
@@ -150,101 +221,48 @@ with tab1:
             fig.add_trace(go.Scatter(
                 x=buy_dates, y=buy_prices,
                 mode="markers",
-                marker=dict(symbol="triangle-up", size=12, color="#00E676", line=dict(width=1, color="black")),
-                name="صفقات شرائك"
+                marker=dict(symbol="triangle-up", size=11, color="#00E676"),
+                name="صفقاتك"
             ))
 
         fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(26,31,44,0.5)",
             xaxis_rangeslider_visible=False,
-            height=420,
-            margin=dict(l=10, r=10, t=30, b=10),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            height=340,
+            margin=dict(l=5, r=5, t=25, b=5),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
         )
         st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
-        st.info(f"جاري تجهيز الشارت الاحترافي... ({e})")
+        st.caption(f"جاري تحميل الشارت... ({e})")
 
     if st.button("🔄 تحديث البيانات والأسعار"):
         st.rerun()
 
+# --- التبويب 2: مناطق الشراء الذكية والمستشار AI ---
 with tab2:
-    st.subheader("🎯 اقتراح أفضل أسعار الشراء (تحليل فني + أساسي)")
-    st.caption("يحلل المؤشرات الفنية لـ 30 يوماً والأخبار الحية ليقترح 3 دفعات شراء لتخفيض متوسطك.")
-    
-    if st.button("🔍 استخرج أفضل 3 مناطق شراء الآن"):
-        with st.spinner("جاري تحليل الشارت والأخبار واقتراح المستويات..."):
+    st.markdown("#### 🎯 أفضل 3 مناطق شراء مقترحة")
+    st.caption("تحليل فني لـ 30 يوماً + الأخبار الحية لتحديد نقاط تعزيز محفظتك.")
+    if st.button("🔍 استخرج مناطق القنص الآن"):
+        with st.spinner("جاري تحليل الشارت والأخبار..."):
             zones = services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams)
-            st.success(zones)
+            st.info(zones)
 
     st.divider()
-    st.subheader("🤖 اسأل المستشار الذكي")
-    user_q = st.text_input("مثال: هل الوقت مناسب لشراء 20 جرام أم أنتظر؟")
-    if st.button("احسب وحلّل"):
+    st.markdown("#### 🤖 اسأل المستشار الذكي")
+    user_q = st.text_input("سؤالك:", placeholder="مثال: شنو يصير لو شريت 20 جرام الحين؟")
+    if st.button("💡 تحليل وإجابة"):
         if user_q:
             with st.spinner("جاري الحساب..."):
                 portfolio_rows = sheet_dashboard.get("A13:I16")
                 answer = services.ask_ai_advisor(user_q, ounce, buy_24k, sell_24k, portfolio_rows)
-                st.info(answer)
+                st.success(answer)
 
     st.divider()
     if st.button("📢 إرسال التقرير الشامل لتيليجرام وواتساب"):
-        with st.spinner("جاري إعداد التقرير وإرساله..."):
+        with st.spinner("جاري الإرسال..."):
             rep = services.generate_and_send_report(sheet_dashboard, send_notifications=True)
             st.markdown(rep, unsafe_allow_html=True)
 
-with tab3:
-    st.subheader("🧮 محاكي تعديل المتوسط (ماذا لو اشتريت؟)")
-    sim_grams = st.slider("الكمية المقترحة للشراء (بالجرام)", min_value=1, max_value=200, value=20, step=1)
-    sim_price = st.number_input("سعر الشراء المتوقع للجرام (د.ك)", value=float(buy_24k) if buy_24k > 0 else 35.0, step=0.1, format="%.3f")
-
-    if curr_grams > 0 and curr_avg > 0:
-        old_total = curr_grams * curr_avg
-        new_total = old_total + (sim_grams * sim_price)
-        new_grams = curr_grams + sim_grams
-        new_avg = round(new_total / new_grams, 3)
-        diff_avg = round(new_avg - curr_avg, 3)
-
-        m1, m2 = st.columns(2)
-        m1.metric("متوسط التكلفة الجديد", f"{new_avg:.3f} د.ك", f"{diff_avg:+.3f} د.ك", delta_color="inverse")
-        m2.metric("الرصيد الإجمالي الجديد", f"{new_grams:.1f} جم", f"+{sim_grams} جم")
-        st.caption(f"التكلفة الإجمالية للدفعة الجديدة: **{round(sim_grams * sim_price, 3):,.3f} د.ك**")
-
-    st.divider()
-    st.subheader("🕌 حاسبة زكاة الذهب التلقائية")
-    if curr_grams >= config.ZAKAT_NISAB_GRAMS:
-        zakat_grams = round(curr_grams * config.ZAKAT_RATE, 3)
-        zakat_kwd = round(zakat_grams * sell_24k, 3)
-        st.warning(f"رصيدك ({curr_grams} جم) بلغ النصاب الشرعي (85 جم عيار 24).")
-        z1, z2 = st.columns(2)
-        z1.metric("مقدار الزكاة (بالجرام)", f"{zakat_grams} جم")
-        z2.metric("قيمة الزكاة النقدية", f"{zakat_kwd:,.3f} د.ك")
-    else:
-        st.success(f"رصيدك ({curr_grams} جم) لم يبلغ النصاب الشرعي (85 جم) بعد.")
-
-with tab4:
-    st.subheader("تسجيل صفقة في دار السبائك")
-    op_type = st.radio("نوع العملية", ["شراء", "بيع"], horizontal=True)
-    grams = st.number_input("الوزن (بالجرام)", min_value=0.1, step=1.0, format="%.2f")
-    price_input = st.number_input("سعر الجرام أو إجمالي الفاتورة (د.ك)", min_value=0.001, step=0.1, format="%.3f")
-
-    if st.button("✅ تسجيل العملية الآن"):
-        final_price = round(price_input / grams, 4) if price_input > 150 else price_input
-        today_str = datetime.now(config.KUWAIT_TZ).strftime("%Y-%m-%d")
-        sheet_log.append_row([today_str, op_type, final_price, grams], value_input_option="USER_ENTERED")
-        st.success(f"تم تسجيل {op_type} {grams} جم بسعر {final_price} د.ك بنجاح!")
-
-with tab5:
-    all_rows = sheet_log.get_all_values()
-    last_5 = list(reversed(all_rows))[:5]
-    for r in last_5:
-        if len(r) >= 4:
-            row_text = " • ".join(r[:4])
-            if "التاريخ" not in row_text:
-                st.write(row_text)
-
-    st.divider()
-    if st.button("🗑️ حذف آخر صفقة مسجلة"):
-        if len(all_rows) > 1:
-            sheet_log.delete_rows(len(all_rows))
-            st.warning("تم حذف آخر صفقة وتحديث الرصيد!")
-            st.rerun()
