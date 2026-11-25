@@ -162,22 +162,19 @@ with tab1:
             <div class="kpi-value">{market_val_str}</div>
         </div>""", unsafe_allow_html=True)
 
-    # مبدّل الإطار الزمني للشارت الاحترافي
     tf_choice = st.radio("الإطار الزمني للشموع:", ["يومي (1D)", "ساعي (1H)"], horizontal=True)
     tf_code = "1H" if "1H" in tf_choice else "1D"
 
     try:
         df_chart, _ = services.get_pro_chart_data(tf_code)
         
-        # إنشاء شارت مزدوج (الشموع اليابانية في الأعلى 75% + مؤشر RSI في الأسفل 25%)
         fig = make_subplots(
             rows=2, cols=1,
             shared_xaxes=True,
             vertical_spacing=0.05,
-            row_heights=[0.75, 0.25]
+            row_heights=(0.75, 0.25)
         )
 
-        # 1. الشموع اليابانية بألوان احترافية
         fig.add_trace(go.Candlestick(
             x=df_chart.index,
             open=df_chart["Open"],
@@ -189,14 +186,12 @@ with tab1:
             name="سعر الجرام"
         ), row=1, col=1)
 
-        # 2. المتوسط المتحرك السريع EMA 9 (خط ذهبي للزخم)
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=df_chart["EMA9"],
             line=dict(color="#F5C542", width=1.4),
             name="زخم EMA 9"
         ), row=1, col=1)
 
-        # 3. البولينجر باند المظلل (منطقة القنص والدعم)
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=df_chart["UpperBB"],
             line=dict(color="rgba(100, 181, 246, 0.3)", width=1),
@@ -211,7 +206,6 @@ with tab1:
             name="نطاق بولينجر"
         ), row=1, col=1)
 
-        # 4. خط متوسط تكلفتك الحالي (نقطة التعادل)
         if curr_avg > 0:
             fig.add_hline(
                 y=curr_avg,
@@ -222,7 +216,6 @@ with tab1:
                 row=1, col=1
             )
 
-        # 5. نقاط صفقات شرائك على الشارت اليومي
         if tf_code == "1D":
             log_rows = sheet_log.get_all_values()
             buy_dates, buy_prices = [], []
@@ -248,7 +241,6 @@ with tab1:
                     name="صفقاتك"
                 ), row=1, col=1)
 
-        # 6. مؤشر القوة النسبية RSI في اللوحة السفلية
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=df_chart["RSI"],
             line=dict(color="#BA68C8", width=1.5),
@@ -269,3 +261,15 @@ with tab1:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
         )
         fig.update_yaxes(title_text="د.ك", row=1, col=1)
+        fig.update_yaxes(title_text="RSI", range=(0, 100), row=2, col=1)
+
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True})
+    except Exception as e:
+        st.caption(f"جاري تحميل الشارت المتطور... ({e})")
+
+    if st.button("🔄 تحديث البيانات والأسعار"):
+        st.rerun()
+
+with tab2:
+    st.markdown("#### 🎯 أفضل 3 مناطق شراء مقترحة")
+    st.caption("تحليل فني + الأخبار الحية لتحديد نقاط تعزيز محفظتك.")
