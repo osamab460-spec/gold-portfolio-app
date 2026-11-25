@@ -1,0 +1,7 @@
+streamlit
+gspread
+google-auth
+google-genai
+requests
+feedparser
+pytz
