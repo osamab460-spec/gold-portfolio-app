@@ -33,10 +33,17 @@ def get_live_gold():
 
 def get_pro_chart_data(timeframe="1D"):
     ticker = yf.Ticker("GC=F")
-    if timeframe == "1H":
+    if timeframe == "15M":
+        hist = ticker.history(period="2d", interval="15m")
+    elif timeframe == "1H":
         hist = ticker.history(period="5d", interval="1h")
+    elif timeframe == "4H":
+        hist = ticker.history(period="1mo", interval="1h")
+        hist = hist.resample("4h").agg({"Open": "first", "High": "max", "Low": "min", "Close": "last"}).dropna()
+    elif timeframe == "1W":
+        hist = ticker.history(period="1y", interval="1wk")
     else:
-        hist = ticker.history(period="2mo", interval="1d")
+        hist = ticker.history(period="3mo", interval="1d")
     
     df = pd.DataFrame(index=hist.index)
     factor = config.KUWAIT_FACTOR / config.OUNCE_TO_GRAM
@@ -45,42 +52,39 @@ def get_pro_chart_data(timeframe="1D"):
     df["Low"] = (hist["Low"] * factor).round(3)
     df["Close"] = (hist["Close"] * factor).round(3)
     
-    # المتوسط المتحرك الأسي السريع (EMA 9) والبولينجر باند (20)
     df["EMA9"] = df["Close"].ewm(span=9, adjust=False).mean().round(3)
     df["SMA20"] = df["Close"].rolling(window=20).mean().round(3)
     std20 = df["Close"].rolling(window=20).std()
     df["UpperBB"] = (df["SMA20"] + (std20 * 2)).round(3)
     df["LowerBB"] = (df["SMA20"] - (std20 * 2)).round(3)
 
-    # حساب مؤشر القوة النسبية RSI (14)
+    # حساب مؤشر القوة النسبية RSI (14) لمعنويات السوق
     delta = df["Close"].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     df["RSI"] = (100 - (100 / (1 + rs))).round(1)
 
-    # خوارزمية اكتشاف شمعات المطرقة (Hammer) والمطرقة المقلوبة (Inverted Hammer)
+    # خوارزمية اكتشاف شمعات المطرقة (Hammer)
     body = (df["Close"] - df["Open"]).abs()
     upper_wick = df["High"] - df[["Open", "Close"]].max(axis=1)
     lower_wick = df[["Open", "Close"]].min(axis=1) - df["Low"]
     total_range = df["High"] - df["Low"]
 
-    # شروط المطرقة القياسية: ذيل سفلي >= ضعف الجسم، ذيل علوي صغير، وحجم شمعة ملموس
-    is_hammer = (
+    df["Hammer"] = (
         (total_range > 0) &
         (lower_wick >= 2.0 * body) &
         (upper_wick <= 0.35 * body) &
-        (body >= 0.015)
+        (body >= 0.012)
     )
-    df["Hammer"] = is_hammer
 
     high_period = round(float(hist["High"].tail(30).max()), 2)
     low_period = round(float(hist["Low"].tail(30).min()), 2)
     sma_20_usd = round(float(hist["Close"].tail(20).mean()), 2)
-    last_rsi = df["RSI"].iloc[-1] if not pd.isna(df["RSI"].iloc[-1]) else 50.0
+    last_rsi = float(df["RSI"].iloc[-1]) if not pd.isna(df["RSI"].iloc[-1]) else 50.0
     
-    tech_summary = f"أعلى سعر (30 شمعة): {high_period}$ | أدنى سعر: {low_period}$ | المتوسط المتحرك 20: {sma_20_usd}$ | مؤشر القوة النسبية (RSI 14): {last_rsi}"
-    return df, tech_summary
+    tech_summary = f"أعلى سعر: {high_period}$ | أدنى سعر: {low_period}$ | المتوسط 20: {sma_20_usd}$ | RSI: {last_rsi}"
+    return df, tech_summary, last_rsi
 
 def get_economic_radar():
     feed = feedparser.parse(config.RSS_NEWS_URL)
@@ -120,7 +124,7 @@ def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
     return _call_gemini_safe(prompt)
 
 def suggest_best_buy_zones(ounce, buy_24k, avg_cost, balance):
-    _, tech_summary = get_pro_chart_data("1D")
+    _, tech_summary, _ = get_pro_chart_data("1D")
     feed = feedparser.parse(config.RSS_NEWS_URL)
     news_text = "\n".join([entry.title for entry in feed.entries[:6]])
     prompt = config.build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text)
