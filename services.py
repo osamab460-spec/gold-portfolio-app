@@ -20,21 +20,23 @@ def get_live_gold():
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     ounce, ch, chp = 0.0, 0.0, 0.0
 
-    # المصدر الأول: Yahoo Finance API (لا يحظر خوادم السحابة ومجاني 100%)
     try:
-        url = "https://yahoo.com"
-        r = requests.get(url, headers=headers, timeout=10).json()
-        meta = r["chart"]["result"][0]["meta"]
-        ounce = float(meta["regularMarketPrice"])
-        prev_close = float(meta.get("chartPreviousClose", ounce))
-        ch = round(ounce - prev_close, 2)
-        chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
+        # مصدر Swissquote المباشر (يعمل من أي خادم سحابي بدون حظر)
+        url = "https://swissquote.com"
+        data = requests.get(url, headers=headers, timeout=10).json()
+        first_item = next(iter(data))
+        prices = first_item.get("spreadProfilePrices", [])
+        first_price = next(iter(prices))
+        bid = float(first_price.get("bid", 0))
+        ask = float(first_price.get("ask", 0))
+        ounce = round((bid + ask) / 2, 2)
     except Exception:
-        # المصدر الاحتياطي: Gold-API
-        res = requests.get(config.GOLD_API_URL, headers=headers, timeout=10).json()
-        ounce = float(res.get("price", 0))
-        ch = float(res.get("ch", 0))
-        chp = float(res.get("chp", 0))
+        # مصدر احتياطي ثاني: Binance PAXG (مرتبط بسعر أونصة الذهب الحية 1:1)
+        url2 = "https://binance.com"
+        r2 = requests.get(url2, headers=headers, timeout=10).json()
+        ounce = round(float(r2.get("lastPrice", 0)), 2)
+        ch = round(float(r2.get("priceChange", 0)), 2)
+        chp = round(float(r2.get("priceChangePercent", 0)), 2)
 
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
