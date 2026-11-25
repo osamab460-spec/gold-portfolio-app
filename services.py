@@ -18,7 +18,8 @@ def init_sheets():
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
 def get_live_gold():
-    res = requests.get(config.GOLD_API_URL, timeout=15).json()
+    headers = {"User-Agent": "Mozilla/5.0"}
+    res = requests.get(config.GOLD_API_URL, headers=headers, timeout=15).json()
     ounce = float(res.get("price", 0))
     ch = float(res.get("ch", 0))
     chp = float(res.get("chp", 0))
@@ -39,12 +40,9 @@ def generate_and_send_report(sheet_dashboard, send_notifications=False):
     sheet_dashboard.update_acell("C5", ounce)
 
     portfolio_rows = sheet_dashboard.get("A5:I18")
-    portfolio_text = "\n".join([
-        f"{r if len(r)>0 else ''} {r if len(r)>2 else ''} {r if len(r)>5 else ''} {r if len(r)>7 else ''}"
-        for r in portfolio_rows
-    ])
+    portfolio_text = "\n".join([" | ".join(r) for r in portfolio_rows if r])
     targets_rows = sheet_dashboard.get("A19:B21")
-    targets_text = "\n".join([f"{r if len(r)>0 else ''} {r if len(r)>1 else ''}" for r in targets_rows])
+    targets_text = "\n".join([" | ".join(r) for r in targets_rows if r])
 
     feed = feedparser.parse(config.RSS_NEWS_URL)
     news_text = "\n".join([entry.title for entry in feed.entries[:7]])
