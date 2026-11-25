@@ -19,7 +19,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# الاتصال بملف الإكسل
 sheet_dashboard, sheet_log = services.init_sheets()
 
 # ================= التحقق من رابط الجدولة التلقائية (Cron) =================
@@ -33,15 +32,16 @@ st.title("🪙 محفظة دار السبائك AI")
 
 try:
     ounce, ch, chp, buy_24k, sell_24k = services.get_live_gold()
-    sheet_dashboard.update_acell("C5", ounce)
+    if ounce > 0:
+        sheet_dashboard.update_acell("C5", ounce)
 
     col1, col2, col3 = st.columns(3)
     col1.metric("الأونصة ($)", f"{ounce:,.2f}", f"{ch:+.2f}$")
     col2.metric("شراء 24 (د.ك)", f"{buy_24k:.3f}")
     col3.metric("بيع 24 (د.ك)", f"{sell_24k:.3f}")
-except Exception:
+except Exception as e:
     ounce, buy_24k, sell_24k = 0, 0, 0
-    st.error("تعذر جلب السعر الحي حالياً.")
+    st.warning(f"تنبيه السعر الحي: {e}")
 
 st.divider()
 
@@ -50,14 +50,15 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 المحفظة", "➕ صفقة جديد�
 
 with tab1:
     rows = sheet_dashboard.get("A15:I15")
-    row = rows if rows else ["0"] * 9
+    row = rows[0] if rows else ["0"] * 9
+    
     c1, c2 = st.columns(2)
-    c1.metric("رصيد الذهب", f"{row} جم")
-    c2.metric("متوسط التكلفة", f"{row} د.ك")
+    c1.metric("رصيد الذهب", f"{row[0] if len(row)>0 else '0'} جم")
+    c2.metric("متوسط التكلفة", f"{row[1] if len(row)>1 else '0'} د.ك")
 
     c3, c4 = st.columns(2)
-    c3.metric("القيمة السوقية", f"{row} د.ك")
-    c4.metric("الربح / الخسارة", f"{row} د.ك")
+    c3.metric("القيمة السوقية", f"{row[2] if len(row)>2 else '0'} د.ك")
+    c4.metric("الربح / الخسارة", f"{row[3] if len(row)>3 else '0'} د.ك")
 
     if st.button("🔄 تحديث البيانات والأسعار"):
         st.rerun()
@@ -95,7 +96,7 @@ with tab4:
     last_5 = all_rows[-5:][::-1]
     for r in last_5:
         if len(r) >= 4:
-            st.write(f"• **{r}** | {r}: {r} جم بسعر {r} د.ك")
+            st.write(f"• **{r[0]}** | {r[1]}: {r[3]} جم بسعر {r[2]} د.ك")
 
     st.divider()
     if st.button("🗑️ حذف آخر صفقة مسجلة"):
