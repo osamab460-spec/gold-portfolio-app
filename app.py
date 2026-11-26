@@ -11,6 +11,8 @@ st.markdown("""
     .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] { background-color: #121212 !important; color: #FFFFFF !important; }
     .main { direction: rtl; text-align: right; }
     p, span, label, div, h1, h2, h3, h4 { color: #F5F5F5 !important; }
+    div[data-testid="stAlert"] { background-color: #1C1C1E !important; border: 1px solid #E6C25A !important; border-radius: 12px; }
+    div[data-baseweb="select"] > div, input, textarea { background-color: #1C1C1E !important; color: #FFFFFF !important; border-color: #333333 !important; }
     .sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 14px 4px; border-bottom: 1px solid #2A2A2A; margin-bottom: 14px; }
     .sabaek-logo { color: #E6C25A !important; font-size: 1.7rem !important; font-weight: 900 !important; }
     .gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; direction: ltr; text-align: left; }
@@ -59,10 +61,16 @@ if not st.session_state.authenticated:
 @st.fragment(run_every=15)
 def live_sabaek_ticker():
     try:
-        data = services.get_live_gold()
-        ounce, chp = data["ounce"], data["chp"]
-        buy_24k, sell_24k = data["buy_24k"], data["sell_24k"]
-        k22, k21, k18 = data["k22"], data["k21"], data["k18"]
+        raw_data = services.get_live_gold()
+        if isinstance(raw_data, dict):
+            ounce, chp = raw_data["ounce"], raw_data["chp"]
+            buy_24k, sell_24k = raw_data["buy_24k"], raw_data["sell_24k"]
+            k22, k21, k18 = raw_data["k22"], raw_data["k21"], raw_data["k18"]
+        else:
+            ounce, _, chp, buy_24k, sell_24k = raw_data
+            k22 = round(buy_24k * (22 / 24), 3)
+            k21 = round(buy_24k * (21 / 24), 3)
+            k18 = round(buy_24k * (18 / 24), 3)
 
         st.session_state["live_ounce"] = ounce
         st.session_state["live_buy_24k"] = buy_24k
@@ -144,7 +152,7 @@ if page == "🏠 الرئيسية والشموع":
         st.plotly_chart(fig, use_container_width=True, config=plotly_cfg)
         st.caption("✏️ استخدم شريط الأدوات أعلى الشارت لرسم خطوط الاتجاه والدعم، أو التبديل بين الشموع والرسم الخطي.")
     except Exception as e:
-        st.info(f"جاري تحميل الشارت: {e}")
+        st.warning(f"تنبيه الشارت: {e}")
 
     st.subheader("💼 ملخص محفظتي")
     m1, m2 = st.columns(2)
@@ -158,15 +166,3 @@ elif page == "🎯 مناطق الشراء":
     st.subheader("🎯 اقتراح أفضل أسعار الشراء")
     if st.button("🔍 استخرج أفضل 3 مناطق شراء الآن"):
         with st.spinner("جاري تحليل الشارت والأخبار..."):
-            zones = services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams)
-            st.success(zones)
-    st.divider()
-    st.subheader("🤖 اسأل المستشار الذكي")
-    user_q = st.text_input("مثال: هل الوقت مناسب لشراء 20 جرام أم أنتظر؟")
-    if st.button("احسب وحلّل"):
-        if user_q:
-            with st.spinner("جاري الحساب..."):
-                portfolio_rows = sheet_dashboard.get("A13:I16")
-                answer = services.ask_ai_advisor(user_q, ounce, buy_24k, sell_24k, portfolio_rows)
-                st.info(answer)
-    st.divider()
