@@ -105,10 +105,7 @@ def live_sabaek_ticker():
         <div class="karat-item"><div class="karat-name">عيار ٢١</div><div class="karat-val {color_cls}">{k21:.3f} د.ك</div></div>
         <div class="karat-item"><div class="karat-name">عيار ١٨</div><div class="karat-val {color_cls}">{k18:.3f} د.ك</div></div>
     </div>""", unsafe_allow_html=True)
-
-live_sabaek_ticker()
-
-ounce = st.session_state.get("live_ounce", 0.0)
+    ounce = st.session_state.get("live_ounce", 0.0)
 buy_24k = st.session_state.get("live_buy_24k", 0.0)
 sell_24k = st.session_state.get("live_sell_24k", 0.0)
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
@@ -176,6 +173,22 @@ if page == "🏠 الرئيسية والشموع":
                     if str(s_cell).strip().upper() == "ON":
                         t_usd = float(str(p_cell).replace(",", ""))
                         y_line = round((t_usd / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3) if unit_code == "KWD" else t_usd
+                        l_color = "#00E676" if str(d_cell).strip() == "DOWN" else "#29B6F6"
+                        fig.add_hline(y=y_line, line_dash="dot", line_color=l_color, line_width=1.4, annotation_text=f"🔔 {y_line}", annotation_position="bottom left", annotation_font_color=l_color)
+
+        fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360)
+        fig.update_layout(margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]})
+    except Exception as e:
+        st.error(f"تنبيه الشارت: {e}")
+
+    st.subheader("💼 ملخص محفظتي")
+    m1, m2 = st.columns(2)
+    m1.metric("رصيد الذهب", f"{gold_balance_str} جم")
+    m2.metric("متوسط التكلفة", f"{avg_cost_str} د.ك")
+    m3, m4 = st.columns(2)
+    m3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
+    m4.metric("صافي الربح / الخسارة (بيع)", f"{net_pnl_kwd:+,.3f} د.ك", delta=f"{net_pnl_kwd:+,.3f} د.ك")
     elif page == "🔔 التنبيهات":
     st.subheader("⚡ إضافة سريعة بالنسب المئوية")
     pct_choice = st.select_slider("اختر نسبة التحرك (%)", options=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0], value=1.5)
@@ -333,3 +346,5 @@ elif page == "📜 السجل":
         sheet_log.delete_rows(len(all_rows))
         st.warning("تم حذف آخر صفقة وتحديث الرصيد!")
         st.rerun()
+
+live_sabaek_ticker()
