@@ -190,10 +190,12 @@ def _call_gemini_safe(prompt):
     return f"⚠️ تعذر الاتصال بالذكاء الاصطناعي. السبب: {last_error}"
 
 def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
-    prompt = f"""أنت حاسبة ذكية ومستشار مالي لمحفظة ذهب (دار السبائك - الكويت). أجب باختصار شديد وبالعربية:
-- سعر الشراء 24: {buy_24k} د.ك | سعر البيع 24: {sell_24k} د.ك | الأونصة الفورية: {ounce}$
-- بيانات المحفظة: {portfolio_rows}
-- سؤال المستخدم: {user_question}"""
+    prompt = (
+        "أنت حاسبة ذكية ومستشار مالي لمحفظة ذهب (دار السبائك - الكويت). أجب باختصار شديد وبالعربية:\n"
+        f"- سعر الشراء 24: {buy_24k} د.ك | سعر البيع 24: {sell_24k} د.ك | الأونصة الفورية: {ounce}$\n"
+        f"- بيانات المحفظة: {portfolio_rows}\n"
+        f"- سؤال المستخدم: {user_question}"
+    )
     return _call_gemini_safe(prompt)
 
 def suggest_best_buy_zones(ounce, buy_24k, avg_cost, balance):
