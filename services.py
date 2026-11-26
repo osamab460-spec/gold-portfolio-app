@@ -117,3 +117,113 @@ def get_live_gold():
         "k22": k22, "k21": k21, "k18": k18,
         "source": source_label
     }
+@st.cache_data(ttl=30)
+def get_candlestick_data(timeframe="15m", unit="KWD"):
+    ticker = yf.Ticker("GC=F")
+    if timeframe == "1m":
+        hist = ticker.history(period="1d", interval="1m").tail(60)
+    elif timeframe == "10m":
+        hist = ticker.history(period="1d", interval="5m").tail(48)
+    elif timeframe == "15m":
+        hist = ticker.history(period="2d", interval="15m").tail(60)
+    elif timeframe == "1h":
+        hist = ticker.history(period="7d", interval="1h")
+    else:
+        hist = ticker.history(period="2mo", interval="1d")
+
+    df = hist[["Open", "High", "Low", "Close"]].dropna().copy()
+
+    live = get_live_gold()
+    spot_usd = live.get("ounce", 0.0)
+    if spot_usd > 0 and not df.empty:
+        futures_last = float(df["Close"].iloc[-1])
+        df = df - (futures_last - spot_usd)
+
+    if unit == "KWD":
+        df = (df * (config.KUWAIT_FACTOR / config.OUNCE_TO_GRAM)).round(3)
+    else:
+        df = df.round(2)
+    return df
+
+@st.cache_data(ttl=300)
+def get_chart_and_technicals():
+    ticker = yf.Ticker("GC=F")
+    hist = ticker.history(period="1mo")
+    high_30d = round(float(hist["High"].max()), 2)
+    low_30d = round(float(hist["Low"].min()), 2)
+    sma_20 = round(float(hist["Close"].tail(20).mean()), 2)
+    delta = hist["Close"].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    rsi = round(float(100 - (100 / (1 + rs.iloc[-1]))), 1)
+    tech_summary = f"أعلى سعر 30 يوم: {high_30d}$ | أدنى سعر 30 يوم: {low_30d}$ | المتوسط المتحرك 20 يوم: {sma_20}$ | مؤشر القوة النسبية (RSI 14): {rsi}"
+    return hist, tech_summary
+
+def _call_gemini_safe(prompt):
+    models_to_try = ["gemini-3.8-flash", "gemini-3-flash-preview", "gemini-2.5-flash"]
+    try:
+        for m in ai_client.models.list():
+            name = m.name.replace("models" + SLASH, "")
+            if "flash" in name and name not in models_to_try:
+                models_to_try.append(name)
+    except Exception:
+        pass
+
+    last_error = ""
+    for model_name in models_to_try:
+        try:
+            res = ai_client.models.generate_content(model=model_name, contents=prompt)
+            return res.text
+        except Exception as e:
+            last_error = str(e)
+            continue
+    return f"⚠️ تعذر الاتصال بالذكاء الاصطناعي. السبب: {last_error}"
+
+def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
+    prompt = f"""أنت حاسبة ذكية ومستشار مالي لمحفظة ذهب (دار السبائك - الكويت). أجب باختصار شديد وبالعربية:
+- سعر الشراء 24: {buy_24k} د.ك | سعر البيع 24: {sell_24k} د.ك | الأونصة: {ounce}$
+- بيانات المحفظة: {portfolio_rows}
+- سؤال المستخدم: {user_question}"""
+    return _call_gemini_safe(prompt)
+
+def suggest_best_buy_zones(ounce, buy_24k, avg_cost, balance):
+    _, tech_summary = get_chart_and_technicals()
+    feed = feedparser.parse(config.RSS_NEWS_URL)
+    news_text = "\n".join([entry.title for entry in feed.entries[:6]])
+    prompt = config.build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text)
+    return _call_gemini_safe(prompt)
+
+def generate_and_send_report(sheet_dashboard, send_notifications=False):
+    data = get_live_gold()
+    ounce, ch, chp, buy_24k = data["ounce"], data["ch"], data["chp"], data["buy_24k"]
+    if ounce > 0:
+        sheet_dashboard.update_acell("C5", ounce)
+
+    portfolio_rows = sheet_dashboard.get("A5:I18")
+    portfolio_text = "\n".join([" | ".join(r) for r in portfolio_rows if r])
+    targets_rows = sheet_dashboard.get("A19:B21")
+    targets_text = "\n".join([" | ".join(r) for r in targets_rows if r])
+
+    feed = feedparser.parse(config.RSS_NEWS_URL)
+    news_text = "\n".join([entry.title for entry in feed.entries[:7]])
+
+    now_kw = datetime.now(config.KUWAIT_TZ).strftime("%A, %Y-%m-%d %H:%M")
+    prompt = config.build_report_prompt(now_kw, ounce, ch, chp, buy_24k, portfolio_text, targets_text, news_text)
+    report_text = _call_gemini_safe(prompt)
+
+    if send_notifications and not report_text.startswith("⚠️"):
+        tg_token = st.secrets.get("TELEGRAM_TOKEN", "").strip()
+        chat_id = st.secrets.get("CHAT_ID", "").strip()
+        ntfy_topic = st.secrets.get("NTFY_TOPIC", "semsem_gold_kw_99").strip()
+
+        if tg_token and chat_id:
+            tg_url = SCHEME + "api.telegram.org" + SLASH + "bot" + tg_token + SLASH + "sendMessage"
+            requests.post(tg_url, json={"chat_id": chat_id, "text": report_text, "parse_mode": "HTML"}, timeout=15)
+
+        if ntfy_topic:
+            plain_text = report_text.replace("<b>", "").replace("</b>", "")
+            ntfy_url = SCHEME + "ntfy.sh" + SLASH + ntfy_topic
+            requests.post(ntfy_url, data=plain_text.encode("utf-8"), headers={"Title": f"تقرير دار السبائك: {buy_24k} د.ك".encode("utf-8")}, timeout=15)
+
+    return report_text
