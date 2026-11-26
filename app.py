@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -40,6 +41,7 @@ if st.query_params.get("cron") == "run":
     st.success("CRON_OK")
     st.stop()
 
+# ================= حماية الدخول برقم سري =================
 APP_PIN = st.secrets.get("APP_PIN", "1234")
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -75,7 +77,7 @@ tv_ticker_html = f"""
 """
 components.html(tv_ticker_html, height=115)
 
-# ================= 2. شريط العيارات الكويتي المتجدد تلقائياً كل 15 ثانية =================
+# ================= 2. شريط العيارات المتجدد كل 15 ثانية (مع تقليل الكتابة على Sheets) =================
 @st.fragment(run_every=15)
 def live_sabaek_karats():
     try:
@@ -97,8 +99,12 @@ def live_sabaek_karats():
             color_cls = "price-same"
         st.session_state["prev_tick_ounce"] = ounce
 
-        if ounce > 0:
+        # تحديث الخلية C5 في Google Sheets مرة واحدة كل 5 دقائق (300 ثانية) لتجنب استهلاك الحصة
+        now_ts = time.time()
+        last_sync = st.session_state.get("last_sheet_sync", 0)
+        if ounce > 0 and (now_ts - last_sync) >= 300:
             sheet_dashboard.update_acell("C5", ounce)
+            st.session_state["last_sheet_sync"] = now_ts
 
         st.markdown(f"""
         <div style="text-align:left; font-size:0.85rem; color:#B8860B; font-weight:800; margin-bottom:4px;">سعر بيع جرام ٢٤ (دار السبائك): {sell_24k:.3f} د.ك</div>
@@ -133,6 +139,7 @@ net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3) if (curr_grams > 0 an
 page = st.radio("القائمة", ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"], horizontal=True, label_visibility="collapsed")
 st.write("")
 
+# ================= الصفحة 1: الرئيسية والشموع =================
 if page == "🏠 الرئيسية والشموع":
     c1, c2, c3 = st.columns(3)
     tf_label = c1.selectbox("الفاصل", ["1 دقيقة", "10 دقائق", "15 دقيقة", "ساعة", "يومي"])
@@ -144,18 +151,21 @@ if page == "🏠 الرئيسية والشموع":
 
     try:
         df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
-        if chart_style == "شموع يابانية 🕯️":
-            trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر")
+        if not df_candles.empty:
+            if chart_style == "شموع يابانية 🕯️":
+                trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر")
+            else:
+                trace = go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), marker=dict(size=4, color="#FFD700"), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
+
+            fig = go.Figure(data=[trace])
+            if show_avg and unit_code == "KWD" and curr_avg > 0:
+                fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
+
+            fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
+            plotly_cfg = {"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]}
+            st.plotly_chart(fig, use_container_width=True, config=plotly_cfg)
         else:
-            trace = go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), marker=dict(size=4, color="#FFD700"), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
-
-        fig = go.Figure(data=[trace])
-        if show_avg and unit_code == "KWD" and curr_avg > 0:
-            fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
-
-        fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
-        plotly_cfg = {"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]}
-        st.plotly_chart(fig, use_container_width=True, config=plotly_cfg)
+            st.info("بيانات الشموع غير متاحة حالياً (قد تكون البورصة مغلقة).")
     except Exception as e:
         st.error(f"تعذر رسم الشارت: {e}")
 
@@ -168,6 +178,7 @@ if page == "🏠 الرئيسية والشموع":
     m3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
     m4.metric("صافي الربح / الخسارة (بيع)", f"{net_pnl_kwd:+,.3f} د.ك", delta=f"{net_pnl_kwd:+,.3f} د.ك")
 
+# ================= الصفحة 2: مناطق الشراء =================
 elif page == "🎯 مناطق الشراء":
     st.subheader("🎯 اقتراح أفضل أسعار الشراء")
     if st.button("🔍 استخرج أفضل 3 مناطق شراء الآن"):
@@ -180,16 +191,3 @@ elif page == "🎯 مناطق الشراء":
     user_q = st.text_input("مثال: هل الوقت مناسب لشراء 20 جرام أم أنتظر؟")
     if st.button("احسب وحلّل"):
         if user_q:
-            st.info("⏳ جاري الحساب...")
-            portfolio_rows = sheet_dashboard.get("A13:I16")
-            answer = services.ask_ai_advisor(user_q, ounce, buy_24k, sell_24k, portfolio_rows)
-            st.success(answer)
-
-    st.divider()
-    if st.button("📢 إرسال التقرير الشامل لتيليجرام وواتساب"):
-        st.info("⏳ جاري الإرسال...")
-        rep = services.generate_and_send_report(sheet_dashboard, send_notifications=True)
-        st.markdown(rep, unsafe_allow_html=True)
-
-elif page == "🧮 الحاسبة والزكاة":
-    st.subheader("🧮 محاكي تعديل المتوسط (ماذا لو اشتريت؟)")
