@@ -189,7 +189,7 @@ if page == "🏠 الرئيسية والشموع":
     m3, m4 = st.columns(2)
     m3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
     m4.metric("صافي الربح / الخسارة (بيع)", f"{net_pnl_kwd:+,.3f} د.ك", delta=f"{net_pnl_kwd:+,.3f} د.ك")
-    elif page == "🔔 التنبيهات":
+elif page == "🔔 التنبيهات":
     st.subheader("⚡ إضافة سريعة بالنسب المئوية")
     pct_choice = st.select_slider("اختر نسبة التحرك (%)", options=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0], value=1.5)
     q1, q2, q3 = st.columns(3)
