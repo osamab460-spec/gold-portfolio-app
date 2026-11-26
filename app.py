@@ -1,6 +1,5 @@
 import time
 import streamlit as st
-import streamlit.components.v1 as components
 import services
 import views
 
@@ -11,6 +10,9 @@ st.markdown("""
     .main { direction: rtl; text-align: right; }
     .sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 12px 4px; border-bottom: 1px solid #E0E0E0; margin-bottom: 10px; }
     .sabaek-logo { color: #B8860B; font-size: 1.65rem; font-weight: 900; }
+    .gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; direction: ltr; text-align: left; }
+    .gold-ticker-title { color: #E6C25A; font-weight: 800; font-size: 1rem; display: flex; justify-content: space-between; }
+    .gold-ticker-price { font-size: 1.45rem; font-weight: 800; margin-top: 6px; }
     .karats-grid { display: grid; grid-template-columns: repeat(4, 1fr); background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 12px 6px; margin-bottom: 14px; text-align: center; direction: rtl; }
     .karat-item { border-left: 1px solid #2E2E32; padding: 0 4px; }
     .karat-item:last-child { border-left: none; }
@@ -50,32 +52,14 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-st.markdown('<div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#555555; font-size:0.8rem;">TradingView OANDA:XAUUSD</span></div>', unsafe_allow_html=True)
-
-tv_script_src = "https://" + "://tradingview.com" + "/external-embedding/embed-widget-single-quote.js"
-tv_ticker_html = f"""
-<div class="tradingview-widget-container" style="border-radius:14px; overflow:hidden; border:1px solid #2E2E32;">
-  <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript" src="{tv_script_src}" async>
-  {{
-  "symbol": "OANDA:XAUUSD",
-  "width": "100%",
-  "isTransparent": false,
-  "colorTheme": "dark",
-  "locale": "ar_AE"
-  }}
-  </script>
-</div>
-"""
-components.html(tv_ticker_html, height=115)
-
 @st.fragment(run_every=15)
 def live_sabaek_karats():
     try:
         data = services.get_live_gold()
-        ounce = data["ounce"]
+        ounce, chp = data["ounce"], data["chp"]
         buy_24k, sell_24k = data["buy_24k"], data["sell_24k"]
         k22, k21, k18 = data["k22"], data["k21"], data["k18"]
+        src_lbl = data.get("source", "SPOT XAU/USD")
 
         st.session_state["live_ounce"] = ounce
         st.session_state["live_buy_24k"] = buy_24k
@@ -83,6 +67,7 @@ def live_sabaek_karats():
 
         prev_ounce = st.session_state.get("prev_tick_ounce", ounce)
         color_cls = "price-up" if ounce > prev_ounce else ("price-down" if ounce < prev_ounce else "price-same")
+        arrow = "▲" if ounce > prev_ounce else ("▼" if ounce < prev_ounce else "•")
         st.session_state["prev_tick_ounce"] = ounce
 
         now_ts = time.time()
@@ -92,7 +77,11 @@ def live_sabaek_karats():
             st.session_state["last_sheet_sync"] = now_ts
 
         st.markdown(f"""
-        <div style="text-align:left; font-size:0.85rem; color:#B8860B; font-weight:800; margin-bottom:4px;">سعر بيع جرام ٢٤ (دار السبائك): {sell_24k:.3f} د.ك</div>
+        <div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#555555; font-size:0.8rem;">{src_lbl} • 15ث ⏱️</span></div>
+        <div class="gold-ticker-box">
+            <div class="gold-ticker-title"><span>🪙 GOLD SPOT (XAU/USD)</span><span style="color:#E6C25A;">بيع 24: {sell_24k:.3f} د.ك</span></div>
+            <div class="gold-ticker-price"><span class="{color_cls}">{ounce:,.3f}</span><span style="font-size:0.9rem; color:#BDBDBD;"> USD </span><span class="{color_cls}" style="font-size:0.95rem;">{arrow} {chp:+.2f}%</span></div>
+        </div>
         <div class="karats-grid">
             <div class="karat-item"><div class="karat-name">شراء ٢٤</div><div class="karat-val {color_cls}">{buy_24k:.3f} د.ك</div></div>
             <div class="karat-item"><div class="karat-name">عيار ٢٢</div><div class="karat-val {color_cls}">{k22:.3f} د.ك</div></div>
