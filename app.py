@@ -1,3 +1,4 @@
+import re
 import time
 import streamlit as st
 import services
@@ -22,7 +23,7 @@ st.markdown("""
     .price-down { color: #FF3D00; }
     .price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }
     div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
-    div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] { color: #E6C25A !important; font-weight: 700 !important; }
+    div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] label, div[data-testid="stMetricLabel"] { color: #E6C25A !important; font-weight: 700 !important; opacity: 1 !important; }
     div[data-testid="stMetricValue"] div, div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 800 !important; }
     div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
     div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; font-weight: 700 !important; }
@@ -98,15 +99,21 @@ ounce = st.session_state.get("live_ounce", 0.0)
 buy_24k = st.session_state.get("live_buy_24k", 0.0)
 sell_24k = st.session_state.get("live_sell_24k", 0.0)
 
+def _extract_num(val_str):
+    nums = re.findall(r"[-+]?\d*\.\d+|\d+", str(val_str).replace(",", ""))
+    return float(nums) if nums else 0.0
+
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 avg_cost_str = sheet_dashboard.acell("D15").value or "0"
 
-try:
-    curr_grams = float(gold_balance_str.replace(",", ""))
-    curr_avg = float(avg_cost_str.replace(",", ""))
-except ValueError:
-    curr_grams, curr_avg = 0.0, 0.0
+curr_grams = _extract_num(gold_balance_str)
+curr_total_cost = _extract_num(total_cost_str)
+curr_avg = _extract_num(avg_cost_str)
+
+if curr_avg <= 0 and curr_grams > 0 and curr_total_cost > 0:
+    curr_avg = round(curr_total_cost / curr_grams, 3)
+    avg_cost_str = f"{curr_avg:.3f}"
 
 net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3) if (curr_grams > 0 and sell_24k > 0) else 0.0
 
