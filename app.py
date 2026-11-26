@@ -128,8 +128,8 @@ st.write("")
 # ================= الصفحة 1: الرئيسية + الشارت السريع + ملخص المحفظة والربح =================
 if page == "🏠 الرئيسية والشموع":
     c1, c2, c3 = st.columns(3)
-    tf_label = c1.selectbox("الفاصل", ["15 دقيقة", "10 دقائق", "ساعة", "يومي"])
-    tf_map = {"15 دقيقة": "15m", "10 دقائق": "10m", "ساعة": "1h", "يومي": "1d"}
+    tf_label = c1.selectbox("الفاصل", ["1 دقيقة", "10 دقائق", "15 دقيقة", "ساعة", "يومي"])
+    tf_map = {"1 دقيقة": "1m", "10 دقائق": "10m", "15 دقيقة": "15m", "ساعة": "1h", "يومي": "1d"}
     unit_label = c2.selectbox("العملة", ["دينار كويتي (د.ك)", "دولار ($)"])
     unit_code = "KWD" if "كويتي" in unit_label else "USD"
     chart_style = c3.selectbox("الرسم", ["شموع يابانية 🕯️", "خطي ذهبي 📈"])
@@ -176,19 +176,3 @@ elif page == "🎯 مناطق الشراء":
         if user_q:
             st.info("⏳ جاري الحساب...")
             portfolio_rows = sheet_dashboard.get("A13:I16")
-            answer = services.ask_ai_advisor(user_q, ounce, buy_24k, sell_24k, portfolio_rows)
-            st.success(answer)
-
-    st.divider()
-    if st.button("📢 إرسال التقرير الشامل لتيليجرام وواتساب"):
-        st.info("⏳ جاري الإرسال...")
-        rep = services.generate_and_send_report(sheet_dashboard, send_notifications=True)
-        st.markdown(rep, unsafe_allow_html=True)
-
-# ================= الصفحة 3: حاسبة تعديل المتوسط والزكاة =================
-elif page == "🧮 الحاسبة والزكاة":
-    st.subheader("🧮 محاكي تعديل المتوسط (ماذا لو اشتريت؟)")
-    sim_grams = st.slider("الكمية المقترحة للشراء (بالجرام)", min_value=1, max_value=200, value=20, step=1)
-    default_price = float(buy_24k) if buy_24k > 0 else 35.0
-    sim_price = st.number_input("سعر الشراء المتوقع للجرام (د.ك)", value=default_price, step=0.1, format="%.3f")
-
