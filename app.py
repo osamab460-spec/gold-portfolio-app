@@ -1,11 +1,8 @@
 import time
 import streamlit as st
 import streamlit.components.v1 as components
-import pandas as pd
-import plotly.graph_objects as go
-from datetime import datetime
-import config
 import services
+import views
 
 st.set_page_config(page_title="دار السبائك AI", page_icon="🪙", layout="centered", initial_sidebar_state="collapsed")
 
@@ -22,14 +19,11 @@ st.markdown("""
     .price-up { color: #00E676; }
     .price-down { color: #FF3D00; }
     .price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }
-
     div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
     div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] { color: #E6C25A !important; font-weight: 700 !important; }
     div[data-testid="stMetricValue"] div, div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 800 !important; }
-
     div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
     div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; font-weight: 700 !important; }
-
     .stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: 800; }
 </style>
 """, unsafe_allow_html=True)
@@ -41,7 +35,6 @@ if st.query_params.get("cron") == "run":
     st.success("CRON_OK")
     st.stop()
 
-# ================= حماية الدخول برقم سري =================
 APP_PIN = st.secrets.get("APP_PIN", "1234")
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -57,7 +50,6 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-# ================= 1. الترويسة وأداة TradingView الرسمية =================
 st.markdown('<div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#555555; font-size:0.8rem;">TradingView OANDA:XAUUSD</span></div>', unsafe_allow_html=True)
 
 tv_script_src = "https://" + "://tradingview.com" + "/external-embedding/embed-widget-single-quote.js"
@@ -77,7 +69,6 @@ tv_ticker_html = f"""
 """
 components.html(tv_ticker_html, height=115)
 
-# ================= 2. شريط العيارات المتجدد كل 15 ثانية (مع تقليل الكتابة على Sheets) =================
 @st.fragment(run_every=15)
 def live_sabaek_karats():
     try:
@@ -91,15 +82,9 @@ def live_sabaek_karats():
         st.session_state["live_sell_24k"] = sell_24k
 
         prev_ounce = st.session_state.get("prev_tick_ounce", ounce)
-        if ounce > prev_ounce:
-            color_cls = "price-up"
-        elif ounce < prev_ounce:
-            color_cls = "price-down"
-        else:
-            color_cls = "price-same"
+        color_cls = "price-up" if ounce > prev_ounce else ("price-down" if ounce < prev_ounce else "price-same")
         st.session_state["prev_tick_ounce"] = ounce
 
-        # تحديث الخلية C5 في Google Sheets مرة واحدة كل 5 دقائق (300 ثانية) لتجنب استهلاك الحصة
         now_ts = time.time()
         last_sync = st.session_state.get("last_sheet_sync", 0)
         if ounce > 0 and (now_ts - last_sync) >= 300:
@@ -139,55 +124,13 @@ net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3) if (curr_grams > 0 an
 page = st.radio("القائمة", ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"], horizontal=True, label_visibility="collapsed")
 st.write("")
 
-# ================= الصفحة 1: الرئيسية والشموع =================
 if page == "🏠 الرئيسية والشموع":
-    c1, c2, c3 = st.columns(3)
-    tf_label = c1.selectbox("الفاصل", ["1 دقيقة", "10 دقائق", "15 دقيقة", "ساعة", "يومي"])
-    tf_map = {"1 دقيقة": "1m", "10 دقائق": "10m", "15 دقيقة": "15m", "ساعة": "1h", "يومي": "1d"}
-    unit_label = c2.selectbox("العملة", ["دينار كويتي (د.ك)", "دولار ($)"])
-    unit_code = "KWD" if "كويتي" in unit_label else "USD"
-    chart_style = c3.selectbox("الرسم", ["شموع يابانية 🕯️", "خطي ذهبي 📈"])
-    show_avg = st.checkbox("إظهار خط متوسط تكلفتي على الشارت", value=True)
-
-    try:
-        df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
-        if not df_candles.empty:
-            if chart_style == "شموع يابانية 🕯️":
-                trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر")
-            else:
-                trace = go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), marker=dict(size=4, color="#FFD700"), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
-
-            fig = go.Figure(data=[trace])
-            if show_avg and unit_code == "KWD" and curr_avg > 0:
-                fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
-
-            fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
-            plotly_cfg = {"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]}
-            st.plotly_chart(fig, use_container_width=True, config=plotly_cfg)
-        else:
-            st.info("بيانات الشموع غير متاحة حالياً (قد تكون البورصة مغلقة).")
-    except Exception as e:
-        st.error(f"تعذر رسم الشارت: {e}")
-
-    st.subheader("💼 ملخص محفظتي")
-    m1, m2 = st.columns(2)
-    m1.metric("رصيد الذهب", f"{gold_balance_str} جم")
-    m2.metric("متوسط التكلفة", f"{avg_cost_str} د.ك")
-
-    m3, m4 = st.columns(2)
-    m3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
-    m4.metric("صافي الربح / الخسارة (بيع)", f"{net_pnl_kwd:+,.3f} د.ك", delta=f"{net_pnl_kwd:+,.3f} د.ك")
-
-# ================= الصفحة 2: مناطق الشراء =================
+    views.render_home_and_chart(gold_balance_str, total_cost_str, avg_cost_str, curr_avg, net_pnl_kwd)
 elif page == "🎯 مناطق الشراء":
-    st.subheader("🎯 اقتراح أفضل أسعار الشراء")
-    if st.button("🔍 استخرج أفضل 3 مناطق شراء الآن"):
-        st.info("⏳ جاري تحليل الشارت والأخبار...")
-        zones = services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams)
-        st.success(zones)
-
-    st.divider()
-    st.subheader("🤖 اسأل المستشار الذكي")
-    user_q = st.text_input("مثال: هل الوقت مناسب لشراء 20 جرام أم أنتظر؟")
-    if st.button("احسب وحلّل"):
-        if user_q:
+    views.render_buy_zones(sheet_dashboard, ounce, buy_24k, sell_24k, curr_avg, curr_grams)
+elif page == "🧮 الحاسبة والزكاة":
+    views.render_calculator_and_zakat(buy_24k, sell_24k, curr_grams, curr_avg)
+elif page == "➕ صفقة":
+    views.render_add_trade(sheet_log)
+elif page == "📜 السجل":
+    views.render_trade_log(sheet_log)
