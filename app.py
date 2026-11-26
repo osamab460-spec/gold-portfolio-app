@@ -126,15 +126,12 @@ st.write("")
 
 if page == "🏠 الرئيسية والشموع":
     c_tf, c_unit, c_opt = st.columns(3)
-    with c_tf:
-        tf_label = st.selectbox("الفاصل الزمني", ["15 دقيقة", "10 دقائق", "ساعة", "يومي"])
-        tf_map = {"15 دقيقة": "15m", "10 دقائق": "10m", "ساعة": "1h", "يومي": "1d"}
-    with c_unit:
-        unit_label = st.selectbox("العملة", ["دينار كويتي (د.ك)", "دولار أمريكي ($)"])
-        unit_code = "KWD" if "كويتي" in unit_label else "USD"
-    with c_opt:
-        show_avg = st.checkbox("خط متوسط تكلفتي", value=True)
-        chart_style = st.selectbox("نوع الرسم", ["شموع يابانية 🕯️", "خطي ذهبي 📈"])
+    tf_label = c_tf.selectbox("الفاصل الزمني", ["15 دقيقة", "10 دقائق", "ساعة", "يومي"])
+    tf_map = {"15 دقيقة": "15m", "10 دقائق": "10m", "ساعة": "1h", "يومي": "1d"}
+    unit_label = c_unit.selectbox("العملة", ["دينار كويتي (د.ك)", "دولار أمريكي ($)"])
+    unit_code = "KWD" if "كويتي" in unit_label else "USD"
+    show_avg = c_opt.checkbox("خط متوسط تكلفتي", value=True)
+    chart_style = c_opt.selectbox("نوع الرسم", ["شموع يابانية 🕯️", "خطي ذهبي 📈"])
 
     try:
         df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
@@ -165,4 +162,4 @@ if page == "🏠 الرئيسية والشموع":
 elif page == "🎯 مناطق الشراء":
     st.subheader("🎯 اقتراح أفضل أسعار الشراء")
     if st.button("🔍 استخرج أفضل 3 مناطق شراء الآن"):
-        with st.spinner("جاري تحليل الشارت والأخبار..."):
+        st.info("⏳ جاري تحليل الشارت والأخبار...")
