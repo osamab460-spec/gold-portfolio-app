@@ -1,6 +1,5 @@
 import os
 import json
-import urllib.parse
 import requests
 import feedparser
 from datetime import datetime
@@ -14,16 +13,21 @@ SCHEME = "https:" + SLASH + SLASH
 
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"].strip().strip('"').strip("'")
 RAW_TG_TOKEN = os.environ.get("TELEGRAM_TOKEN", "").strip().strip('"').strip("'")
-TELEGRAM_TOKEN = RAW_TG_TOKEN.split("bot")[-1].split(SLASH) if ("bot" in RAW_TG_TOKEN and SLASH in RAW_TG_TOKEN) else RAW_TG_TOKEN
+if "bot" in RAW_TG_TOKEN and SLASH in RAW_TG_TOKEN:
+    TELEGRAM_TOKEN = RAW_TG_TOKEN.split("bot")[-1].split(SLASH)
+else:
+    TELEGRAM_TOKEN = RAW_TG_TOKEN
 
+CHAT_ID = os.environ.get("CHAT_ID", "").strip()
 GOOGLE_CREDENTIALS = os.environ["GOOGLE_CREDENTIALS"]
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "semsem_gold_kw_99").strip()
+
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 def get_spot_ounce():
     try:
-        url = SCHEME + "://swissquote.com" + SLASH + "public-quotes" + SLASH + "bboquotes" + SLASH + "instrument" + SLASH + "XAU" + SLASH + "USD"
-        data = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=6).json()
+        sq_url = SCHEME + "://swissquote.com" + SLASH + "public-quotes" + SLASH + "bboquotes" + SLASH + "instrument" + SLASH + "XAU" + SLASH + "USD"
+        data = requests.get(sq_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=6).json()
         p = next(iter(next(iter(data)).get("spreadProfilePrices", [])))
         return round((float(p["bid"]) + float(p["ask"])) / 2, 3)
     except Exception:
@@ -39,28 +43,25 @@ def call_gemini_safe(prompt):
     return "⚠️ تعذر توليد التحليل حالياً."
 
 def send_all_channels(title, html_message, is_urgent=False):
-    if TELEGRAM_TOKEN and ":" in TELEGRAM_TOKEN:
+    if TELEGRAM_TOKEN and ":" in TELEGRAM_TOKEN and CHAT_ID:
         try:
             tg_url = SCHEME + "api.telegram.org" + SLASH + "bot" + TELEGRAM_TOKEN + SLASH + "sendMessage"
-            requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": html_message, "parse_mode": "HTML"}, timeout=15)
+            requests.post(tg_url, json={"chat_id": CHAT_ID, "text": html_message, "parse_mode": "HTML"}, timeout=15)
         except Exception as e:
             print("Telegram warning:", e)
-
-    try:
-        clean_text = html_message.replace("<b>", "*").replace("</b>", "*")
-        wa_url = SCHEME + "://callmebot.com" + SLASH + "whatsapp.php?phone=" + str(config.WHATSAPP_PHONE) + "&apikey=" + str(config.WHATSAPP_APIKEY) + "&text=" + urllib.parse.quote(clean_text[:950])
-        requests.get(wa_url, timeout=15)
-    except Exception as e:
-        print("WhatsApp warning:", e)
 
     if NTFY_TOPIC:
         try:
             plain_text = html_message.replace("<b>", "").replace("</b>", "")
             ntfy_url = SCHEME + "ntfy.sh" + SLASH + NTFY_TOPIC
-            requests.post(ntfy_url, data=plain_text.encode("utf-8"), headers={"Title": title.encode("utf-8"), "Priority": "urgent" if is_urgent else "high", "Tags": "rotating_light" if is_urgent else "coin"}, timeout=15)
+            requests.post(
+                ntfy_url,
+                data=plain_text.encode("utf-8"),
+                headers={"Title": title.encode("utf-8"), "Priority": "urgent" if is_urgent else "high", "Tags": "rotating_light" if is_urgent else "coin"},
+                timeout=15
+            )
         except Exception as e:
             print("ntfy warning:", e)
-
 def run_quarter_hourly_monitor():
     gc = gspread.service_account_from_dict(json.loads(GOOGLE_CREDENTIALS))
     sh = gc.open_by_key(config.SPREADSHEET_ID)
@@ -83,14 +84,13 @@ def run_quarter_hourly_monitor():
     if ounce > 0:
         sheet_dashboard.update_acell("C5", ounce)
 
-    # قراءة بيانات المحفظة الحالية لحساب تأثير المتوسط الجديد في التنبيهات
     try:
         curr_grams = float(str(sheet_dashboard.acell("A15").value or "0").replace(",", ""))
         curr_avg = float(str(sheet_dashboard.acell("D15").value or "0").replace(",", ""))
     except Exception:
         curr_grams, curr_avg = 0.0, 0.0
 
-    # 1. فحص جميع التنبيهات السعرية المسجلة في ورقة "التنبيهات"
+    # 1. فحص التنبيهات السعرية المسجلة في ورقة "التنبيهات"
     try:
         sheet_alerts = sh.worksheet("التنبيهات")
         alert_rows = sheet_alerts.get_all_values()
@@ -175,6 +175,19 @@ def run_quarter_hourly_monitor():
         full_alert = f"{alert_header}\n\n{call_gemini_safe(alert_prompt)}"
         send_all_channels(f"إنذار ذهب عاجل: {buy_24k} د.ك", full_alert, is_urgent=True)
 
+    # 3. تنبيه استباقي للأخبار الاقتصادية الأمريكية الكبرى (الساعة 14:00 بتوقيت الكويت)
+    if current_hour == 14 and current_minute < 15:
+        feed = feedparser.parse(config.RSS_NEWS_URL)
+        headlines = " | ".join([entry.title for entry in feed.entries[:8]])
+        macro_keywords = ("CPI", "FOMC", "Fed", "NFP", "Non-Farm", "Powell", "Interest Rate", "Inflation")
+        if any(k.lower() in headlines.lower() for k in macro_keywords):
+            macro_prompt = f"""أنت محلل أسواق الذهب. افحص عناوين الأخبار التالية اليوم ({now_kw}):
+{headlines}
+إذا كان هناك بيان اقتصادي أمريكي هام يصدر اليوم (مثل التضخم CPI، الفائدة الفيدرالية FOMC، أو الوظائف NFP)، اكتب تنبيهاً تحذيرياً من 3 أسطر فقط بتنسيق HTML (وسم <b> فقط) يوضح موعد الخبر المتوقع بتوقيت الكويت وتأثيره المحتمل على الذهب."""
+            macro_msg = "📅⚠️ <b>تنبيه أخبار اقتصادية هامة اليوم:</b>\n\n" + call_gemini_safe(macro_prompt)
+            send_all_channels("⚠️ بيان اقتصادي أمريكي مؤثر اليوم", macro_msg, is_urgent=True)
+
+    # 4. التقرير الدوري الشامل
     if (current_hour in (10, 14, 18, 22) and current_minute < 15) or os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
         feed = feedparser.parse(config.RSS_NEWS_URL)
         news_text = "\n".join([entry.title for entry in feed.entries[:7]])
