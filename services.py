@@ -32,7 +32,7 @@ def get_live_gold():
             "symbols": {"tickers": ["OANDA:XAUUSD", "FX_IDC:XAUUSD"]},
             "columns": ["close", "open", "change", "change_abs"]
         }
-        tv_res = requests.post(tv_url, json=payload, timeout=6).json()
+        tv_res = requests.post(tv_url, json=payload, timeout=5).json()
         rows = tv_res.get("data", [])
         if rows:
             first_row = next(iter(rows))
@@ -160,18 +160,19 @@ def get_chart_and_technicals():
     tech_summary = f"أعلى سعر 30 يوم: {high_30d}$ | أدنى سعر 30 يوم: {low_30d}$ | المتوسط المتحرك 20 يوم: {sma_20}$ | مؤشر القوة النسبية (RSI 14): {rsi}"
     return hist, tech_summary
 
-def _call_gemini_safe(prompt):
-    models_to_try = ["gemini-3.8-flash", "gemini-3-flash-preview", "gemini-2.5-flash"]
+@st.cache_data(ttl=600)
+def _get_cached_news():
     try:
-        for m in ai_client.models.list():
-            name = m.name.replace("models/", "")
-            if "flash" in name and name not in models_to_try:
-                models_to_try.append(name)
+        res = requests.get(config.RSS_NEWS_URL, timeout=4)
+        feed = feedparser.parse(res.content)
+        return "\n".join([entry.title for entry in feed.entries[:6]])
     except Exception:
-        pass
+        return "لا توجد أخبار عاجلة حالياً."
 
+def _call_gemini_safe(prompt):
     last_error = ""
-    for model_name in models_to_try:
+    # الاتصال المباشر بأسرع نموذج مستقر دون إضاعة الوقت في البحث عن النماذج
+    for model_name in ["gemini-2.5-flash", "gemini-2.0-flash"]:
         try:
             res = ai_client.models.generate_content(model=model_name, contents=prompt)
             return res.text
@@ -189,8 +190,7 @@ def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
 
 def suggest_best_buy_zones(ounce, buy_24k, avg_cost, balance):
     _, tech_summary = get_chart_and_technicals()
-    feed = feedparser.parse(config.RSS_NEWS_URL)
-    news_text = "\n".join([entry.title for entry in feed.entries[:6]])
+    news_text = _get_cached_news()
     prompt = config.build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text)
     return _call_gemini_safe(prompt)
 
@@ -205,8 +205,7 @@ def generate_and_send_report(sheet_dashboard, send_notifications=False):
     targets_rows = sheet_dashboard.get("A19:B21")
     targets_text = "\n".join([" | ".join(r) for r in targets_rows if r])
 
-    feed = feedparser.parse(config.RSS_NEWS_URL)
-    news_text = "\n".join([entry.title for entry in feed.entries[:7]])
+    news_text = _get_cached_news()
 
     now_kw = datetime.now(config.KUWAIT_TZ).strftime("%A, %Y-%m-%d %H:%M")
     prompt = config.build_report_prompt(now_kw, ounce, ch, chp, buy_24k, portfolio_text, targets_text, news_text)
