@@ -13,7 +13,8 @@ st.markdown("""
     p, span, label, div, h1, h2, h3, h4 { color: #F5F5F5 !important; }
     div[data-testid="stAlert"] { background-color: #1C1C1E !important; border: 1px solid #E6C25A !important; border-radius: 12px; }
     div[data-baseweb="select"] > div, input, textarea { background-color: #1C1C1E !important; color: #FFFFFF !important; border-color: #333333 !important; }
-    ul[role="listbox"], li[role="option"] { background-color: #1C1C1E !important; color: #FFFFFF !important; }
+    div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"], li[role="option"] { background-color: #1C1C1E !important; color: #FFFFFF !important; }
+    li[role="option"]:hover { background-color: #2E2E32 !important; }
     .sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 14px 4px; border-bottom: 1px solid #2A2A2A; margin-bottom: 14px; }
     .sabaek-logo { color: #E6C25A !important; font-size: 1.7rem !important; font-weight: 900 !important; }
     .gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; direction: ltr; text-align: left; }
@@ -62,16 +63,10 @@ if not st.session_state.authenticated:
 @st.fragment(run_every=15)
 def live_sabaek_ticker():
     try:
-        raw_data = services.get_live_gold()
-        if isinstance(raw_data, dict):
-            ounce, chp = raw_data["ounce"], raw_data["chp"]
-            buy_24k, sell_24k = raw_data["buy_24k"], raw_data["sell_24k"]
-            k22, k21, k18 = raw_data["k22"], raw_data["k21"], raw_data["k18"]
-        else:
-            ounce, _, chp, buy_24k, sell_24k = raw_data
-            k22 = round(buy_24k * (22 / 24), 3)
-            k21 = round(buy_24k * (21 / 24), 3)
-            k18 = round(buy_24k * (18 / 24), 3)
+        data = services.get_live_gold()
+        ounce, chp = data["ounce"], data["chp"]
+        buy_24k, sell_24k = data["buy_24k"], data["sell_24k"]
+        k22, k21, k18 = data["k22"], data["k21"], data["k18"]
 
         st.session_state["live_ounce"] = ounce
         st.session_state["live_buy_24k"] = buy_24k
@@ -92,7 +87,7 @@ def live_sabaek_ticker():
         st.markdown(f"""
         <div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#9E9E9E; font-size:0.8rem;">تحديث تلقائي 15ث ⏱️</span></div>
         <div class="gold-ticker-box">
-            <div class="gold-ticker-title">🪙 GOLD <span style="font-size:0.75rem; color:#888; margin-left:auto;">TradingView Live</span></div>
+            <div class="gold-ticker-title">🪙 GOLD SPOT <span style="font-size:0.75rem; color:#888; margin-left:auto;">XAU/USD Live</span></div>
             <div class="gold-ticker-price"><span class="{color_cls}">{ounce:,.3f}</span><span style="font-size:0.9rem; color:#BDBDBD;"> USD </span><span class="{color_cls}" style="font-size:0.95rem;">{arrow} {chp:+.2f}%</span></div>
         </div>
         <div class="karats-grid">
@@ -164,3 +159,7 @@ elif page == "🎯 مناطق الشراء":
     st.subheader("🎯 اقتراح أفضل أسعار الشراء")
     if st.button("🔍 استخرج أفضل 3 مناطق شراء الآن"):
         st.info("⏳ جاري تحليل الشارت والأخبار...")
+        zones = services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams)
+        st.success(zones)
+    st.divider()
+    st.subheader("🤖 اسأل المستشار الذكي")
