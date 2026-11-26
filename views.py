@@ -52,11 +52,11 @@ def render_home_and_chart(gold_balance_str, total_cost_str, avg_cost_str, curr_a
 
     st.subheader("💼 ملخص محفظتي")
     m1, m2 = st.columns(2)
-    m1.metric("رصيد الذهب", f"{gold_balance_str} جم")
-    m2.metric("متوسط التكلفة", f"{avg_cost_str} د.ك")
+    m1.metric("رصيد الذهب", f"{gold_balance_str}")
+    m2.metric("متوسط التكلفة", f"{avg_cost_str} د.ك" if "د.ك" not in str(avg_cost_str) else f"{avg_cost_str}")
 
     m3, m4 = st.columns(2)
-    m3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
+    m3.metric("إجمالي التكلفة", f"{total_cost_str}")
     m4.metric("صافي الربح / الخسارة (بيع)", f"{net_pnl_kwd:+,.3f} د.ك", delta=f"{net_pnl_kwd:+,.3f} د.ك")
 
 def render_buy_zones(sheet_dashboard, ounce, buy_24k, sell_24k, curr_avg, curr_grams):
@@ -84,20 +84,19 @@ def render_buy_zones(sheet_dashboard, ounce, buy_24k, sell_24k, curr_avg, curr_g
 def render_calculator_and_zakat(buy_24k, sell_24k, curr_grams, curr_avg):
     st.subheader("🧮 محاكي تعديل المتوسط (ماذا لو اشتريت؟)")
     sim_grams = st.slider("الكمية المقترحة للشراء (بالجرام)", min_value=1, max_value=200, value=20, step=1)
-    default_price = float(buy_24k) if buy_24k > 0 else 35.0
-    sim_price = st.number_input("سعر الشراء المتوقع للجرام (د.ك)", value=default_price, step=0.1, format="%.3f")
+    default_price = float(buy_24k) if buy_24k > 0 else 36.300
+    sim_price = st.number_input("سعر الشراء المتوقع للجرام (د.ك)", value=default_price, step=0.05, format="%.3f")
 
-    if curr_grams > 0 and curr_avg > 0:
-        old_total = curr_grams * curr_avg
-        new_total = old_total + (sim_grams * sim_price)
-        new_grams = curr_grams + sim_grams
-        new_avg = round(new_total / new_grams, 3)
-        diff_avg = round(new_avg - curr_avg, 3)
+    old_total = curr_grams * curr_avg
+    new_total = old_total + (sim_grams * sim_price)
+    new_grams = curr_grams + sim_grams
+    new_avg = round(new_total / new_grams, 3) if new_grams > 0 else sim_price
+    diff_avg = round(new_avg - curr_avg, 3) if curr_avg > 0 else 0.0
 
-        c1, c2 = st.columns(2)
-        c1.metric("متوسط التكلفة الجديد", f"{new_avg:.3f} د.ك", f"{diff_avg:+.3f} د.ك", delta_color="inverse")
-        c2.metric("الرصيد الإجمالي الجديد", f"{new_grams:.1f} جم", f"+{sim_grams} جم")
-        st.info(f"💰 التكلفة الإجمالية للدفعة الجديدة: **{round(sim_grams * sim_price, 3):,.3f} د.ك**")
+    c1, c2 = st.columns(2)
+    c1.metric("متوسط التكلفة الجديد", f"{new_avg:.3f} د.ك", f"{diff_avg:+.3f} د.ك", delta_color="inverse")
+    c2.metric("الرصيد الإجمالي الجديد", f"{new_grams:.1f} جم", f"+{sim_grams} جم")
+    st.info(f"💰 التكلفة الإجمالية للدفعة الجديدة: **{round(sim_grams * sim_price, 3):,.3f} د.ك** | متوسطك الحالي: **{curr_avg:.3f} د.ك**")
 
     st.divider()
     st.subheader("🕌 حاسبة زكاة الذهب التلقائية")
@@ -131,16 +130,16 @@ def render_trade_log(sheet_log):
         for r in reversed(all_rows[1:]):
             if len(r) >= 4:
                 try:
-                    p = float(str(r[2]).replace(",", ""))
-                    g = float(str(r[3]).replace(",", ""))
+                    p = float(str(r).replace(",", ""))
+                    g = float(str(r).replace(",", ""))
                     tot = round(p * g, 3)
                 except ValueError:
                     tot = 0.0
                 records.append({
-                    "التاريخ": r[0],
-                    "العملية": f"🟢 {r[1]}" if "شراء" in r[1] else f"🔴 {r[1]}",
-                    "السعر (د.ك)": r[2],
-                    "الوزن (جم)": r[3],
+                    "التاريخ": r,
+                    "العملية": f"🟢 {r}" if "شراء" in r else f"🔴 {r}",
+                    "السعر (د.ك)": r,
+                    "الوزن (جم)": r,
                     "الإجمالي (د.ك)": f"{tot:,.3f}"
                 })
         df_log = pd.DataFrame(records)
