@@ -1,16 +1,24 @@
 import pytz
+import streamlit as st
+
+def _get_secret(key, default=""):
+    try:
+        return str(st.secrets.get(key, default)).strip()
+    except Exception:
+        import os
+        return str(os.environ.get(key, default)).strip()
 
 # ================= الإعدادات الأساسية =================
 SPREADSHEET_ID = "11s82rxEoX0TwGgzyp8LTYC2XeWJK9Jp3hk_KS14szuo"
 SHEET_DASHBOARD_NAME = "لوحة التحليل العام"
 SHEET_LOG_NAME = "سجل العمليات"
 
-CHAT_ID = "7342639951"
-WHATSAPP_PHONE = "96597894119"
-WHATSAPP_APIKEY = "9510859"
+CHAT_ID = _get_secret("CHAT_ID", "7342639951")
+WHATSAPP_PHONE = _get_secret("WHATSAPP_PHONE", "96597894119")
+WHATSAPP_APIKEY = _get_secret("WHATSAPP_APIKEY", "9510859")
 
 KUWAIT_TZ = pytz.timezone("Asia/Kuwait")
-RSS_NEWS_URL = "https://google.com"
+RSS_NEWS_URL = "https://" + "://google.com" + "/rss/search?q=gold+price+XAUUSD+FOMC+CPI+Fed&hl=en-US&gl=US&ceid=US:en"
 
 # ================= معادلات التسعير والزكاة (الكويت - دار السبائك) =================
 OUNCE_TO_GRAM = 31.1035
@@ -19,7 +27,6 @@ SELL_SPREAD_KWD = 0.295
 ZAKAT_NISAB_GRAMS = 85.0
 ZAKAT_RATE = 0.025
 
-# ================= برومبت اقتراح أفضل مناطق الشراء =================
 def build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text):
     return f"""أنت كبير محللي أسواق الذهب ومستشار مالي في الكويت (تطبيق دار السبائك).
 بناءً على التحليل الفني لآخر 30 يوماً والأخبار الاقتصادية، اقترح لي أفضل 3 مستويات سعرية للشراء لتعزيز محفظتي وتخفيض متوسط تكلفتي.
@@ -38,14 +45,13 @@ def build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news
    - **الدفعة الثالثة (قاع قوي/قنص):** السعر بالدولار + السعر بالكويتي + نسبة السيولة المقترحة.
 3. نصيحة لإدارة المخاطر بناءً على الأخبار القادمة."""
 
-# ================= قالب البرومبت للتقرير الدوري =================
 def build_report_prompt(now_kw, ounce, ch, chp, buy_24k, portfolio_text, targets_text, news_text):
     return f"""أنت مستشاري المالي ومحلل أسواق الذهب في الكويت (تطبيق دار السبائك).
 🗓️ اليوم والوقت الحالي بتوقيت الكويت: {now_kw}
 
 قواعد صارمة وحسابية:
 1. تنسيق الرسالة: اكتب التقرير بتنسيق HTML المتوافق مع تليجرام فقط. استخدم وسوم <b>العنوان</b> للخط العريض، ويُمنع تماماً استخدام النجوم ** أو علامات # أو أي رموز Markdown.
-2. قاعدة التقرير الأسبوعي: إذا كان اسم اليوم هو "Sunday" وكانت الساعة حوالي "18"، اكتب "<b>التقرير الأسبوعي الشامل لما قبل افتتاح البورصة</b>". أما في باقي أيام الأسبوع فابدأ بالتقرير المعتاد مباشرة.
+2. قاعدة التقرير الأسبوعي: إذا كان اسم اليوم هو "Sunday" وكانت الساعة حوالي "18"، اكتب "<b>التقرير الأسبوعي الشامل لما قبل افتتاح البورصة</b>".
 3. اعتمد دائماً على الأرقام الفعلية لرصيدي ومتوسط تكلفتي الموجودة في (بيانات محفظتي). إذا كان متوسط تكلفتي أعلى من سعر السوق الحالي، فأنا في حالة خسارة دفترية ويُمنع تماماً اقتراح البيع.
 4. لدي سيولة نقدية مقسمة على 3 دفعات لخفض المتوسط، وأترقب استمرار الهبوط.
 5. بروتوكول الطوارئ: إذا تحركت الأونصة صعوداً أو هبوطاً بأكثر من 35$ (أو أكثر من 1.2%) خلال اليوم، ابدأ بـ:
