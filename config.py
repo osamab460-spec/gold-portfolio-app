@@ -1,14 +1,16 @@
-import os
 import pytz
 
-# ================= الإعدادات العامة (بدون بيانات شخصية) =================
-SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "11s82rxEoX0TwGgzyp8LTYC2XeWJK9Jp3hk_KS14szuo")
+# ================= الإعدادات الأساسية =================
+SPREADSHEET_ID = "11s82rxEoX0TwGgzyp8LTYC2XeWJK9Jp3hk_KS14szuo"
 SHEET_DASHBOARD_NAME = "لوحة التحليل العام"
 SHEET_LOG_NAME = "سجل العمليات"
 
+CHAT_ID = "7342639951"
+WHATSAPP_PHONE = "96597894119"
+WHATSAPP_APIKEY = "9510859"
+
 KUWAIT_TZ = pytz.timezone("Asia/Kuwait")
-SLASH = chr(47)
-RSS_NEWS_URL = "https:" + SLASH + SLASH + "://google.com" + SLASH + "rss" + SLASH + "search?q=gold+price+forecast+FOMC+CPI+NFP+federal+reserve&hl=en-US&gl=US&ceid=US:en"
+RSS_NEWS_URL = "https://google.com"
 
 # ================= معادلات التسعير والزكاة (الكويت - دار السبائك) =================
 OUNCE_TO_GRAM = 31.1035
@@ -23,7 +25,7 @@ def build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news
 بناءً على التحليل الفني لآخر 30 يوماً والأخبار الاقتصادية، اقترح لي أفضل 3 مستويات سعرية للشراء لتعزيز محفظتي وتخفيض متوسط تكلفتي.
 
 بياناتي الحالية:
-- سعر الأونصة الحالي: {ounce}$ | سعر شراء جرام 24 في دار السبائك: {buy_24k} د.ك
+- سعر الأونصة الفوري: {ounce}$ | سعر شراء جرام 24 في دار السبائك: {buy_24k} د.ك
 - رصيدي الحالي: {balance} جرام | متوسط تكلفتي الحالي: {avg_cost} د.ك
 - المؤشرات الفنية لآخر 30 يوماً: {tech_summary}
 - أهم الأخبار الحية: {news_text}
