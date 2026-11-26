@@ -23,11 +23,14 @@ st.markdown("""
 .price-up { color: #00E676; }
 .price-down { color: #FF3D00; }
 .price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }
-div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
-div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] { color: #E6C25A !important; font-weight: 700 !important; }
-div[data-testid="stMetricValue"] div, div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 800 !important; }
+
+/* إظهار بطاقات ملخص محفظتي بخلفية داكنة ونص أبيض وذهبي واضح تماماً */
+[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px !important; padding: 12px 14px !important; }
+[data-testid="stMetricLabel"] * { color: #E6C25A !important; font-weight: 700 !important; }
+[data-testid="stMetricValue"] * { color: #FFFFFF !important; font-weight: 800 !important; }
+
 div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
-div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; font-weight: 700 !important; }
+div[role="radiogroup"] label * { color: #FFFFFF !important; font-weight: 700 !important; }
 .stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: 800; }
 </style>
 """, unsafe_allow_html=True)
@@ -131,7 +134,9 @@ if page != "🏠 الرئيسية والشموع":
     .gold-ticker-title span:first-child { color: #E6C25A !important; }
     .price-up { color: #00E676 !important; }
     .price-down { color: #FF3D00 !important; }
-    div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; }
+    div[role="radiogroup"] label * { color: #FFFFFF !important; }
+    [data-testid="stMetricLabel"] * { color: #E6C25A !important; }
+    [data-testid="stMetricValue"] * { color: #FFFFFF !important; }
     input, textarea, div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { background-color: #F4F5F7 !important; color: #111111 !important; border: 1px solid #CCCCCC !important; }
     div[data-testid="stAlert"] { background-color: #F8F9FA !important; border: 1px solid #D4AF37 !important; }
     .stButton>button { background-color: #E6C25A !important; color: #111111 !important; }
@@ -146,7 +151,14 @@ if page == "🏠 الرئيسية والشموع":
     chart_style = c3.selectbox("الرسم", ["شموع يابانية 🕯️", "خطي ذهبي 📈"])
     show_avg = st.checkbox("إظهار خط متوسط تكلفتي والتنبيهات على الشارت", value=True)
 
-    df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
+    df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code).copy()
+    # مطابقة فورية لشموع الشارت مع السعر الفوري الحالي (Spot)
+    if not df_candles.empty:
+        target_now = buy_24k if unit_code == "KWD" else ounce
+        if target_now > 0:
+            diff_val = float(df_candles["Close"].iloc[-1]) - target_now
+            df_candles = (df_candles - diff_val).round(3 if unit_code == "KWD" else 2)
+
     if chart_style == "شموع يابانية 🕯️":
         trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر")
     else:
@@ -157,18 +169,11 @@ if page == "🏠 الرئيسية والشموع":
         if unit_code == "KWD" and curr_avg > 0:
             fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
         for r in sheet_alerts.get_all_values()[1:]:
-            if len(r) >= 4 and str(r[3]).strip().upper() == "ON":
-                t_usd = float(str(r[1]).replace(",", ""))
+            if len(r) >= 4 and str(r).strip().upper() == "ON":
+                t_usd = float(str(r).replace(",", ""))
                 y_line = round((t_usd / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3) if unit_code == "KWD" else t_usd
-                l_color = "#00E676" if r[2] == "DOWN" else "#29B6F6"
+                l_color = "#00E676" if r == "DOWN" else "#29B6F6"
                 fig.add_hline(y=y_line, line_dash="dot", line_color=l_color, line_width=1.4, annotation_text=f"🔔 {y_line}", annotation_position="bottom left", annotation_font_color=l_color)
-
-    fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360)
-    fig.update_layout(margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]})
-
-    st.subheader("💼 ملخص محفظتي")
- 
 elif page == "🔔 التنبيهات":
     st.subheader("⚡ إضافة سريعة بالنسب المئوية")
     pct_choice = st.select_slider("اختر نسبة التحرك (%)", options=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0], value=1.5)
@@ -218,7 +223,7 @@ elif page == "🔔 التنبيهات":
         for idx, r in enumerate(alert_rows[1:], start=2):
             if len(r) >= 4:
                 try:
-                    u_v = float(str(r[1]).replace(",", ""))
+                    u_v = float(str(r).replace(",", ""))
                     k_v = round((u_v / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
                     rem = round(((u_v - ounce) / ounce) * 100, 2) if ounce > 0 else 0.0
                 except Exception:
@@ -228,9 +233,9 @@ elif page == "🔔 التنبيهات":
                     "الأونصة": f"{u_v:,.2f}$",
                     "الجرام": f"{k_v:.3f}",
                     "المتبقي": f"{rem:+.1f}%",
-                    "النوع": "📉 شراء" if r[2] == "DOWN" else "📈 بيع",
-                    "الحالة": "🟢 نشط" if r[3] == "ON" else "✅ منفّذ",
-                    "الكمية": r[4] if len(r) > 4 else "0"
+                    "النوع": "📉 شراء" if r == "DOWN" else "📈 بيع",
+                    "الحالة": "🟢 نشط" if r == "ON" else "✅ منفّذ",
+                    "الكمية": r if len(r) > 4 else "0"
                 })
         st.dataframe(pd.DataFrame(disp), use_container_width=True, hide_index=True)
 
@@ -241,9 +246,9 @@ elif page == "🔔 التنبيهات":
             st.rerun()
         if b2.button("✅ تسجيل كصفقة"):
             rd = alert_rows[int(sel_row) - 1]
-            t_k = round((float(str(rd[1]).replace(",", "")) / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
-            t_g = float(str(rd[4]).replace(",", "")) if (len(rd) > 4 and float(rd[4] or 0) > 0) else 10.0
-            sheet_log.append_row([datetime.now(config.KUWAIT_TZ).strftime("%Y-%m-%d"), "شراء" if rd[2] == "DOWN" else "بيع", t_k, t_g], value_input_option="USER_ENTERED")
+            t_k = round((float(str(rd).replace(",", "")) / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
+            t_g = float(str(rd).replace(",", "")) if (len(rd) > 4 and float(rd or 0) > 0) else 10.0
+            sheet_log.append_row([datetime.now(config.KUWAIT_TZ).strftime("%Y-%m-%d"), "شراء" if rd == "DOWN" else "بيع", t_k, t_g], value_input_option="USER_ENTERED")
             sheet_alerts.update_acell(f"D{int(sel_row)}", "TRIGGERED")
             st.success("تم تسجيل الصفقة!")
         if b3.button("🗑️ حذف"):
@@ -308,7 +313,7 @@ elif page == "📜 السجل":
         records = []
         for r in reversed(all_rows[1:]):
             if len(r) >= 4:
-                d_s, t_s, p_s, w_s = r[0], r[1], r[2], r[3]
+                d_s, t_s, p_s, w_s = r[:4]
                 try:
                     tot = round(float(str(p_s).replace(",", "")) * float(str(w_s).replace(",", "")), 3)
                 except ValueError:
