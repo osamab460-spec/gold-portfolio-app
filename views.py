@@ -110,10 +110,25 @@ def render_calculator_and_zakat(buy_24k, sell_24k, curr_grams, curr_avg):
     new_grams = curr_grams + sim_grams
     new_avg = round(new_total / new_grams, 3) if new_grams > 0 else sim_price
     diff_avg = round(new_avg - curr_avg, 3) if curr_avg > 0 else 0.0
+    diff_color = "#00E676" if diff_avg <= 0 else "#FF3D00"
+    diff_arrow = "▼" if diff_avg < 0 else ("▲" if diff_avg > 0 else "•")
 
-    c1, c2 = st.columns(2)
-    c1.metric("متوسط التكلفة الجديد", f"{new_avg:.3f} د.ك", f"{diff_avg:+.3f} د.ك", delta_color="inverse")
-    c2.metric("الرصيد الإجمالي الجديد", f"{new_grams:.1f} جم", f"+{sim_grams} جم")
+    # بطاقات HTML مخصصة للمحاكي تضمن وضوح العناوين الذهبية
+    st.markdown(f"""
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; direction:rtl; margin:8px 0 12px 0;">
+        <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
+            <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">⚖️ متوسط التكلفة الجديد</div>
+            <div style="color:#FFFFFF; font-size:1.35rem; font-weight:800;">{new_avg:.3f} د.ك</div>
+            <div style="color:{diff_color}; font-size:0.85rem; font-weight:700; margin-top:2px;">{diff_arrow} {diff_avg:+.3f} د.ك</div>
+        </div>
+        <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
+            <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">🪙 الرصيد الإجمالي الجديد</div>
+            <div style="color:#FFFFFF; font-size:1.35rem; font-weight:800;">{new_grams:.1f} جم</div>
+            <div style="color:#00E676; font-size:0.85rem; font-weight:700; margin-top:2px;">▲ +{sim_grams} جم</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.info(f"💰 التكلفة الإجمالية للدفعة الجديدة: **{round(sim_grams * sim_price, 3):,.3f} د.ك** | متوسطك الحالي: **{curr_avg:.3f} د.ك**")
 
     st.divider()
@@ -122,9 +137,18 @@ def render_calculator_and_zakat(buy_24k, sell_24k, curr_grams, curr_avg):
         zakat_grams = round(curr_grams * config.ZAKAT_RATE, 3)
         zakat_kwd = round(zakat_grams * sell_24k, 3)
         st.warning(f"رصيدك ({curr_grams} جم) بلغ النصاب الشرعي (85 جم عيار 24).")
-        z1, z2 = st.columns(2)
-        z1.metric("مقدار الزكاة (بالجرام)", f"{zakat_grams} جم")
-        z2.metric("قيمة الزكاة النقدية", f"{zakat_kwd:,.3f} د.ك")
+        st.markdown(f"""
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; direction:rtl; margin-top:8px;">
+            <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
+                <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">🕌 مقدار الزكاة (بالجرام)</div>
+                <div style="color:#FFFFFF; font-size:1.35rem; font-weight:800;">{zakat_grams} جم</div>
+            </div>
+            <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
+                <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">💵 قيمة الزكاة النقدية</div>
+                <div style="color:#FFFFFF; font-size:1.35rem; font-weight:800;">{zakat_kwd:,.3f} د.ك</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     else:
         st.success(f"رصيدك ({curr_grams} جم) لم يبلغ النصاب الشرعي (85 جم) بعد.")
 
@@ -142,32 +166,3 @@ def render_add_trade(sheet_log):
 
 def render_trade_log(sheet_log):
     st.subheader("📜 سجل صفقات محفظتي")
-    all_rows = sheet_log.get_all_values()
-    if len(all_rows) > 1:
-        records = []
-        for r in reversed(all_rows[1:]):
-            if len(r) >= 4:
-                date_val, op_val, price_val, grams_val = r[:4]
-                try:
-                    p = float(str(price_val).replace(",", ""))
-                    g = float(str(grams_val).replace(",", ""))
-                    tot = round(p * g, 3)
-                except ValueError:
-                    tot = 0.0
-                records.append({
-                    "التاريخ": date_val,
-                    "العملية": f"🟢 {op_val}" if "شراء" in op_val else f"🔴 {op_val}",
-                    "السعر (د.ك)": price_val,
-                    "الوزن (جم)": grams_val,
-                    "الإجمالي (د.ك)": f"{tot:,.3f}"
-                })
-        df_log = pd.DataFrame(records)
-        st.dataframe(df_log, use_container_width=True, hide_index=True)
-    else:
-        st.info("لا توجد صفقات مسجلة في السجل حتى الآن.")
-
-    st.divider()
-    if st.button("🗑️ حذف آخر صفقة مسجلة") and len(all_rows) > 1:
-        sheet_log.delete_rows(len(all_rows))
-        st.warning("تم حذف آخر صفقة وتحديث الرصيد!")
-        st.rerun()
