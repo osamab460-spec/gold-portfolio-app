@@ -103,6 +103,7 @@ sell_24k = st.session_state.get("live_sell_24k", 0.0)
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 avg_cost_str = sheet_dashboard.acell("D15").value or "0"
+
 try:
     curr_grams = float(gold_balance_str.replace(",", ""))
     curr_avg = float(avg_cost_str.replace(",", ""))
@@ -135,20 +136,24 @@ if page == "🏠 الرئيسية والشموع":
     unit_code = "KWD" if "كويتي" in unit_label else "USD"
     chart_style = c3.selectbox("الرسم", ["شموع يابانية 🕯️", "خطي ذهبي 📈"])
     show_avg = st.checkbox("إظهار خط متوسط تكلفتي والتنبيهات على الشارت", value=True)
+    
     try:
         df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
         if chart_style == "شموع يابانية 🕯️":
             trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر")
         else:
             trace = go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
+        
         fig = go.Figure(data=[trace])
         if show_avg:
             if unit_code == "KWD" and curr_avg > 0:
                 fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
+            
             for r in sheet_alerts.get_all_values()[1:]:
                 if len(r) >= 4 and str(r[3]).strip().upper() == "ON":
                     t_usd = float(str(r[1]).replace(",", ""))
                     y_line = round((t_usd / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3) if unit_code == "KWD" else t_usd
                     l_color = "#00E676" if r[2] == "DOWN" else "#29B6F6"
                     fig.add_hline(y=y_line, line_dash="dot", line_color=l_color, line_width=1.4, annotation_text=f"🔔 {y_line}", annotation_position="bottom left", annotation_font_color=l_color)
+        
         fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
