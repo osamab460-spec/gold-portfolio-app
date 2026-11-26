@@ -11,17 +11,22 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ================= تصميم واجهة فخمة (Gold & Dark Theme) =================
+# ================= تصميم واجهة فخمة مع إجبار وضوح النصوص البيضاء والذهبية =================
 st.markdown("""
 <style>
     /* خلفية داكنة فخمة واتجاه عربي */
-    .stApp {
-        background-color: #0E1117;
-        color: #F5F5F5;
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background-color: #0E1117 !important;
+        color: #FFFFFF !important;
     }
     .main { direction: rtl; text-align: right; }
-    
-    /* تنسيق العنوان الرئيسي */
+
+    /* إجبار جميع النصوص والتسميات على اللون الأبيض الواضح */
+    p, span, label, div, h1, h2, h3, h4, .stMarkdown {
+        color: #F3F4F6 !important;
+    }
+
+    /* تنسيق الترويسة الرئيسية */
     .gold-header {
         background: linear-gradient(135deg, #1E2129 0%, #14171F 100%);
         border: 1px solid #D4AF37;
@@ -32,62 +37,73 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(212, 175, 55, 0.15);
     }
     .gold-header h1 {
-        color: #FFD700;
-        font-size: 1.65rem;
+        color: #FFD700 !important;
+        font-size: 1.65rem !important;
         margin: 0;
         font-weight: 800;
     }
     .gold-header p {
-        color: #A0AAB5;
-        font-size: 0.85rem;
+        color: #D1D5DB !important;
+        font-size: 0.9rem !important;
         margin: 4px 0 0 0;
     }
 
     /* بطاقات المؤشرات */
     div[data-testid="stMetric"] {
-        background-color: #161A23;
-        border: 1px solid #2A303E;
-        border-right: 4px solid #D4AF37;
+        background-color: #161A23 !important;
+        border: 1px solid #2A303E !important;
+        border-right: 4px solid #D4AF37 !important;
         border-radius: 12px;
         padding: 12px 14px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     }
-    div[data-testid="stMetricLabel"] {
-        color: #9BA3AF !important;
-        font-size: 0.85rem !important;
+    div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] {
+        color: #FFD700 !important;
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
     }
-    div[data-testid="stMetricValue"] {
+    div[data-testid="stMetricValue"] div, div[data-testid="stMetricValue"] {
         color: #FFFFFF !important;
-        font-size: 1.3rem !important;
-        font-weight: 700 !important;
-    }
-
-    /* الأزرار الذهبية */
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(90deg, #C59B27 0%, #E5C158 100%);
-        color: #0E1117 !important;
-        border: none;
-        border-radius: 12px;
-        height: 3.1em;
-        font-weight: 800;
-        font-size: 1rem;
-        transition: all 0.2s ease;
-    }
-    .stButton>button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+        font-size: 1.4rem !important;
+        font-weight: 800 !important;
     }
 
     /* شريط التنقل */
     div[role="radiogroup"] {
         direction: rtl;
         justify-content: center;
-        background-color: #161A23;
-        padding: 8px;
+        background-color: #161A23 !important;
+        padding: 10px 8px;
         border-radius: 14px;
-        border: 1px solid #2A303E;
-        gap: 6px;
+        border: 1px solid #D4AF37;
+        gap: 8px;
+    }
+    div[role="radiogroup"] label p {
+        color: #FFFFFF !important;
+        font-size: 0.95rem !important;
+        font-weight: 700 !important;
+    }
+
+    /* حقول الإدخال والقوائم المنسدلة */
+    input, select, textarea, div[data-baseweb="select"] > div {
+        background-color: #1E2330 !important;
+        color: #FFFFFF !important;
+        border-color: #374151 !important;
+    }
+
+    /* الأزرار الذهبية */
+    .stButton>button {
+        width: 100%;
+        background: linear-gradient(90deg, #C59B27 0%, #E5C158 100%) !important;
+        border: none !important;
+        border-radius: 12px;
+        height: 3.1em;
+        transition: all 0.2s ease;
+    }
+    .stButton>button p {
+        color: #0E1117 !important;
+        font-weight: 800 !important;
+        font-size: 1.05rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -178,7 +194,6 @@ if page == "📊 المحفظة والشموع":
 
     st.subheader("🕯️ شارت الشموع اليابانية التفاعلي")
     
-    # أدوات التحكم وتحرير الشارت
     ctrl1, ctrl2, ctrl3 = st.columns(3)
     with ctrl1:
         tf_label = st.selectbox("الإطار الزمني", ["يومي (شهرين)", "ساعي (7 أيام)", "ربع ساعة (يومين)"])
@@ -187,8 +202,8 @@ if page == "📊 المحفظة والشموع":
         unit_label = st.selectbox("العملة", ["دينار كويتي (جرام 24)", "دولار أمريكي (الأونصة)"])
         unit_code = "KWD" if "كويتي" in unit_label else "USD"
     with ctrl3:
-        show_avg = st.checkbox("إظهار خط متوسط تكلفتي", value=True)
-        show_sma = st.checkbox("إظهار المتوسط المتحرك (MA10)", value=True)
+        show_avg = st.checkbox("خط متوسط تكلفتي", value=True)
+        show_sma = st.checkbox("المتوسط المتحرك (MA10)", value=True)
 
     try:
         df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
@@ -204,7 +219,6 @@ if page == "📊 المحفظة والشموع":
             name="السعر"
         )])
 
-        # إضافة خط متوسط التكلفة إذا كانت العملة دينار كويتي
         if show_avg and unit_code == "KWD" and curr_avg > 0:
             fig.add_hline(
                 y=curr_avg,
@@ -216,7 +230,6 @@ if page == "📊 المحفظة والشموع":
                 annotation_font_color="#FFD700"
             )
 
-        # إضافة خط المتوسط المتحرك السريع
         if show_sma and len(df_candles) >= 10:
             sma10 = df_candles["Close"].rolling(window=10).mean()
             fig.add_trace(go.Scatter(
@@ -238,14 +251,13 @@ if page == "📊 المحفظة والشموع":
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
 
-        # تفعيل شريط أدوات التحرير والرسم فوق الشارت (رسم خطوط، تكبير، تصوير)
         plotly_config = {
             "displayModeBar": True,
             "scrollZoom": True,
             "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]
         }
         st.plotly_chart(fig, use_container_width=True, config=plotly_config)
-        st.caption("💡 يمكنك لمس الشموع لعرض التفاصيل، أو استخدام أدوات الرسم أعلى الشارت لرسم خطوط الدعم والمقاومة.")
+        st.caption("💡 المس الشموع لعرض الأسعار، أو استخدم أدوات الرسم أعلى الشارت لرسم خطوط الدعم والمقاومة.")
     except Exception as e:
         st.info(f"جاري تحميل بيانات الشموع: {e}")
 
@@ -278,14 +290,3 @@ elif page == "🎯 مناطق الشراء":
             rep = services.generate_and_send_report(sheet_dashboard, send_notifications=True)
             st.markdown(rep, unsafe_allow_html=True)
 
-# --- الصفحة 3: حاسبة تعديل المتوسط + الزكاة ---
-elif page == "🧮 الحاسبة والزكاة":
-    st.subheader("🧮 محاكي تعديل المتوسط (ماذا لو اشتريت؟)")
-    sim_grams = st.slider("الكمية المقترحة للشراء (بالجرام)", min_value=1, max_value=200, value=20, step=1)
-    default_price = float(buy_24k) if buy_24k > 0 else 35.0
-    sim_price = st.number_input("سعر الشراء المتوقع للجرام (د.ك)", value=default_price, step=0.1, format="%.3f")
-
-    if curr_grams > 0 and curr_avg > 0:
-        old_total = curr_grams * curr_avg
-        new_total = old_total + (sim_grams * sim_price)
-        new_grams = curr_grams + sim_grams
