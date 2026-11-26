@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -13,7 +14,7 @@ st.markdown("""
 .sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 12px 4px; border-bottom: 1px solid #2E2E32; margin-bottom: 12px; }
 .sabaek-logo { color: #E6C25A; font-size: 1.65rem; font-weight: 900; }
 .gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; direction: ltr; text-align: left; }
-.gold-ticker-title { color: #E6C25A; font-weight: 800; font-size: 1rem; display: flex; justify-content: space-between; }
+.gold-ticker-title { color: #E6C25A; font-weight: 800; font-size: 0.95rem; display: flex; justify-content: space-between; }
 .gold-ticker-price { font-size: 1.45rem; font-weight: 800; margin-top: 6px; }
 .karats-grid { display: grid; grid-template-columns: repeat(4, 1fr); background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 12px 6px; margin-bottom: 14px; text-align: center; direction: rtl; }
 .karat-item { border-left: 1px solid #2E2E32; padding: 0 4px; }
@@ -48,11 +49,6 @@ def get_alerts_sheet():
 
 sheet_alerts = get_alerts_sheet()
 
-if st.query_params.get("cron") == "run":
-    services.generate_and_send_report(sheet_dashboard, send_notifications=True)
-    st.success("CRON_OK")
-    st.stop()
-
 APP_PIN = st.secrets.get("APP_PIN", "1234")
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -76,6 +72,7 @@ def live_sabaek_ticker():
     buy_24k = data["buy_24k"]
     sell_24k = data["sell_24k"]
     k22, k21, k18 = data["k22"], data["k21"], data["k18"]
+    src_lbl = data.get("source", "")
 
     st.session_state["live_ounce"] = ounce
     st.session_state["live_buy_24k"] = buy_24k
@@ -90,11 +87,16 @@ def live_sabaek_ticker():
         color_cls, arrow = "price-same", "•"
     st.session_state["prev_tick_ounce"] = ounce
 
-    if ounce > 0:
-        sheet_dashboard.update_acell("C5", ounce)
+    now_ts = time.time()
+    if ounce > 0 and (now_ts - st.session_state.get("last_c5_write", 0) > 300):
+        try:
+            sheet_dashboard.update_acell("C5", ounce)
+            st.session_state["last_c5_write"] = now_ts
+        except Exception:
+            pass
 
     st.markdown(f"""
-    <div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#9E9E9E; font-size:0.8rem;">تحديث تلقائي 15ث ⏱️</span></div>
+    <div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#9E9E9E; font-size:0.78rem;">{src_lbl} • 15ث</span></div>
     <div class="gold-ticker-box">
         <div class="gold-ticker-title"><span>🪙 GOLD SPOT (XAU/USD)</span><span style="color:#E6C25A;">بيع 24: {sell_24k:.3f} د.ك</span></div>
         <div class="gold-ticker-price"><span class="{color_cls}">{ounce:,.3f}</span><span style="font-size:0.9rem; color:#BDBDBD;"> USD </span><span class="{color_cls}" style="font-size:0.95rem;">{arrow} {chp:+.2f}%</span></div>
@@ -105,9 +107,12 @@ def live_sabaek_ticker():
         <div class="karat-item"><div class="karat-name">عيار ٢١</div><div class="karat-val {color_cls}">{k21:.3f} د.ك</div></div>
         <div class="karat-item"><div class="karat-name">عيار ١٨</div><div class="karat-val {color_cls}">{k18:.3f} د.ك</div></div>
     </div>""", unsafe_allow_html=True)
-    ounce = st.session_state.get("live_ounce", 0.0)
+
+live_sabaek_ticker()
+ounce = st.session_state.get("live_ounce", 0.0)
 buy_24k = st.session_state.get("live_buy_24k", 0.0)
 sell_24k = st.session_state.get("live_sell_24k", 0.0)
+
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 avg_cost_str = sheet_dashboard.acell("D15").value or "0"
@@ -119,24 +124,10 @@ except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
 net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3) if (curr_grams > 0 and sell_24k > 0) else 0.0
+breakeven_ounce = round(((curr_avg + config.SELL_SPREAD_KWD) * config.OUNCE_TO_GRAM) / config.KUWAIT_FACTOR, 2) if curr_avg > 0 else 0.0
+
 page = st.radio("القائمة", ["🏠 الرئيسية والشموع", "🔔 التنبيهات", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"], horizontal=True, label_visibility="collapsed")
 st.write("")
-
-if page != "🏠 الرئيسية والشموع":
-    st.markdown("""<style>
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] { background-color: #FFFFFF !important; color: #111111 !important; }
-    h1, h2, h3, h4, p, span, label, div, .stMarkdown { color: #111111 !important; }
-    .gold-ticker-box span, .karats-grid .karat-name { color: #E0E0E0 !important; }
-    .gold-ticker-title span:first-child { color: #E6C25A !important; }
-    .price-up { color: #00E676 !important; }
-    .price-down { color: #FF3D00 !important; }
-    div[role="radiogroup"] label * { color: #FFFFFF !important; }
-    [data-testid="stMetricLabel"] * { color: #E6C25A !important; }
-    [data-testid="stMetricValue"] * { color: #FFFFFF !important; }
-    input, textarea, div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { background-color: #F4F5F7 !important; color: #111111 !important; border: 1px solid #CCCCCC !important; }
-    div[data-testid="stAlert"] { background-color: #F8F9FA !important; border: 1px solid #D4AF37 !important; }
-    .stButton>button { background-color: #E6C25A !important; color: #111111 !important; }
-    </style>""", unsafe_allow_html=True)
 
 if page == "🏠 الرئيسية والشموع":
     c1, c2, c3 = st.columns(3)
@@ -176,8 +167,7 @@ if page == "🏠 الرئيسية والشموع":
                         l_color = "#00E676" if str(d_cell).strip() == "DOWN" else "#29B6F6"
                         fig.add_hline(y=y_line, line_dash="dot", line_color=l_color, line_width=1.4, annotation_text=f"🔔 {y_line}", annotation_position="bottom left", annotation_font_color=l_color)
 
-        fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360)
-        fig.update_layout(margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
+        fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]})
     except Exception as e:
         st.error(f"تنبيه الشارت: {e}")
@@ -189,6 +179,13 @@ if page == "🏠 الرئيسية والشموع":
     m3, m4 = st.columns(2)
     m3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
     m4.metric("صافي الربح / الخسارة (بيع)", f"{net_pnl_kwd:+,.3f} د.ك", delta=f"{net_pnl_kwd:+,.3f} د.ك")
+
+    if breakeven_ounce > 0:
+        diff_to_be = round(breakeven_ounce - ounce, 2)
+        if diff_to_be > 0:
+            st.info(f"⚖️ **نقطة التعادل الحقيقية (للبيع بدون خسارة):** تحتاج لصعود الأونصة إلى **{breakeven_ounce:,.2f}$** (متبقي **+{diff_to_be:,.2f}$**).")
+        else:
+            st.success(f"🎉 **تجاوزت نقطة التعادل ({breakeven_ounce:,.2f}$)!** محفظتك الآن في منطقة الربح الصافي عند البيع.")
 elif page == "🔔 التنبيهات":
     st.subheader("⚡ إضافة سريعة بالنسب المئوية")
     pct_choice = st.select_slider("اختر نسبة التحرك (%)", options=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0], value=1.5)
@@ -201,9 +198,8 @@ elif page == "🔔 التنبيهات":
         t_usd = round(ounce * (1 + pct_choice / 100.0), 2)
         sheet_alerts.append_row([datetime.now(config.KUWAIT_TZ).strftime("%Y-%m-%d %H:%M"), t_usd, "UP", "ON", 0, f"صعود {pct_choice}%"], value_input_option="USER_ENTERED")
         st.rerun()
-    if q3.button("⚖️ التعادل") and curr_avg > 0:
-        be_usd = round((curr_avg * config.OUNCE_TO_GRAM) / config.KUWAIT_FACTOR, 2)
-        sheet_alerts.append_row([datetime.now(config.KUWAIT_TZ).strftime("%Y-%m-%d %H:%M"), be_usd, "UP", "ON", 0, "نقطة التعادل"], value_input_option="USER_ENTERED")
+    if q3.button("⚖️ التعادل") and breakeven_ounce > 0:
+        sheet_alerts.append_row([datetime.now(config.KUWAIT_TZ).strftime("%Y-%m-%d %H:%M"), breakeven_ounce, "UP", "ON", 0, "نقطة التعادل"], value_input_option="USER_ENTERED")
         st.rerun()
 
     st.divider()
@@ -288,7 +284,7 @@ elif page == "🎯 مناطق الشراء":
         st.info("⏳ جاري الحساب...")
         st.success(services.ask_ai_advisor(user_q, ounce, buy_24k, sell_24k, sheet_dashboard.get("A13:I16")))
     st.divider()
-    if st.button("📢 إرسال التقرير الشامل لتيليجرام وواتساب"):
+    if st.button("📢 إرسال التقرير الشامل لتيليجرام والإشعارات"):
         st.info("⏳ جاري الإرسال...")
         st.markdown(services.generate_and_send_report(sheet_dashboard, send_notifications=True), unsafe_allow_html=True)
 
@@ -346,5 +342,3 @@ elif page == "📜 السجل":
         sheet_log.delete_rows(len(all_rows))
         st.warning("تم حذف آخر صفقة وتحديث الرصيد!")
         st.rerun()
-
-live_sabaek_ticker()
