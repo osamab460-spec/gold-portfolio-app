@@ -35,14 +35,14 @@ def _scrape_daralsabaek():
 
     nums = [float(x) for x in kwd_matches if 20.0 <= float(x) <= 60.0]
     if len(nums) >= 8:
-        ounce = float(usd_matches.replace(",", "")) if usd_matches else 0.0
+        ounce = float(usd_matches[0].replace(",", "")) if usd_matches else 0.0
         return {
             "ounce": ounce,
-            "buy_24k": nums,
-            "sell_24k": nums,
-            "k22": nums,
-            "k21": nums,
-            "k18": nums,
+            "buy_24k": nums[0],
+            "sell_24k": nums[1],
+            "k22": nums[2],
+            "k21": nums[4],
+            "k18": nums[6],
             "source": "daralsabaek_live"
         }
     return None
@@ -91,7 +91,7 @@ def get_live_gold():
         except Exception:
             pass
 
-    # 4. المصدر الفوري الثالث: PAXG-USD (مرتبط بسعر أونصة الذهب الفورية 1:1)
+    # 4. المصدر الفوري الثالث: PAXG-USD
     if ounce <= 0:
         try:
             paxg = yf.Ticker("PAXG-USD").history(period="1d", interval="1m")
@@ -143,6 +143,14 @@ def get_candlestick_data(timeframe="15m", unit="KWD"):
         hist = ticker.history(period="2mo", interval="1d")
 
     df = hist[["Open", "High", "Low", "Close"]].dropna().copy()
+
+    # مطابقة شموع الشارت مع السعر الفوري الحالي لدار السبائك
+    live = get_live_gold()
+    spot_usd = live.get("ounce", 0.0)
+    if spot_usd > 0 and not df.empty:
+        futures_last = float(df["Close"].iloc[-1])
+        df = df - (futures_last - spot_usd)
+
     if unit == "KWD":
         df = (df * (config.KUWAIT_FACTOR / config.OUNCE_TO_GRAM)).round(3)
     else:
