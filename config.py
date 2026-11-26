@@ -14,8 +14,8 @@ RSS_NEWS_URL = "https://google.com"
 
 # ================= معادلات التسعير والزكاة (الكويت) =================
 OUNCE_TO_GRAM = 31.1035
-KUWAIT_FACTOR = 0.3170
-SELL_SPREAD_KWD = 0.250
+KUWAIT_FACTOR = 0.31743
+SELL_SPREAD_KWD = 0.295
 ZAKAT_NISAB_GRAMS = 85.0
 ZAKAT_RATE = 0.025
 
