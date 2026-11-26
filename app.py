@@ -101,8 +101,9 @@ sell_24k = st.session_state.get("live_sell_24k", 0.0)
 
 def _extract_num(val_str):
     nums = re.findall(r"[-+]?\d*\.\d+|\d+", str(val_str).replace(",", ""))
-    return float(nums) if nums else 0.0
-
+def _extract_num(val_str):
+    nums = re.findall(r"[-+]?\d*\.\d+|\d+", str(val_str).replace(",", ""))
+    return float(next(iter(nums))) if nums else 0.0
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 avg_cost_str = sheet_dashboard.acell("D15").value or "0"
