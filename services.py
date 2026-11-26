@@ -20,8 +20,7 @@ def init_sheets():
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
 def _scrape_daralsabaek():
-    # محاولة سحب الأسعار مباشرة من صفحة حاسبة دار السبائك
-    url = "https://daralsabaek.com/gold-calculator"
+    url = "https://daralsabaek.com"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "Accept-Language": "ar,en;q=0.9"
@@ -31,11 +30,9 @@ def _scrape_daralsabaek():
         return None
 
     text = resp.text
-    # البحث عن أسعار العيارات بصيغة (رقم د.ك مثل 36.435)
     kwd_matches = re.findall(r'(\d{2}\.\d{3})\s*(?:د\.ك|KWD)', text)
     usd_matches = re.findall(r'(\d{1},?\d{3}\.\d{2,3})\s*USD', text)
 
-    # التحقق من العثور على أسعار العيارات الأربعة (شراء وبيع 24، 22، 21، 18)
     nums = [float(x) for x in kwd_matches if 20.0 <= float(x) <= 60.0]
     if len(nums) >= 8:
         ounce = float(usd_matches.replace(",", "")) if usd_matches else 0.0
@@ -53,36 +50,27 @@ def _scrape_daralsabaek():
 @st.cache_data(ttl=15)
 def get_live_gold():
     headers = {"User-Agent": "Mozilla/5.0"}
-    
-    # 1. جلب التغير اليومي للأونصة
-    ticker = yf.Ticker("GC=F")
-    hist_1d = ticker.history(period="2d")
-    prev_close = round(float(hist_1d["Close"].iloc[-2]), 3) if len(hist_1d) > 1 else 0.0
+    ounce = 0.0
 
-    # 2. محاولة السحب المباشر من موقع دار السبائك أولاً
-    scraped = None
+    # 1. محاولة السحب المباشر من موقع دار السبائك
     try:
         scraped = _scrape_daralsabaek()
+        if scraped and scraped["buy_24k"] > 0:
+            ticker = yf.Ticker("GC=F")
+            hist_1d = ticker.history(period="2d")
+            prev_close = round(float(hist_1d["Close"].iloc[-2]), 3) if len(hist_1d) > 1 else scraped["ounce"]
+            ounce = scraped["ounce"] if scraped["ounce"] > 0 else round(float(hist_1d["Close"].iloc[-1]), 3)
+            ch = round(ounce - prev_close, 3) if prev_close else 0.0
+            chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
+            return {
+                "ounce": ounce, "ch": ch, "chp": chp,
+                "buy_24k": scraped["buy_24k"], "sell_24k": scraped["sell_24k"],
+                "k22": scraped["k22"], "k21": scraped["k21"], "k18": scraped["k18"]
+            }
     except Exception:
-        scraped = None
+        pass
 
-    if scraped and scraped["buy_24k"] > 0:
-        ounce = scraped["ounce"] if scraped["ounce"] > 0 else round(float(hist_1d["Close"].iloc[-1]), 3)
-        ch = round(ounce - prev_close, 3) if prev_close else 0.0
-        chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
-        return {
-            "ounce": ounce,
-            "ch": ch,
-            "chp": chp,
-            "buy_24k": scraped["buy_24k"],
-            "sell_24k": scraped["sell_24k"],
-            "k22": scraped["k22"],
-            "k21": scraped["k21"],
-            "k18": scraped["k18"]
-        }
-
-    # 3. المصدر الاحتياطي الفوري (معادلة دار السبائك الدقيقة)
-    ounce = 0.0
+    # 2. المصدر الفوري الأول: Swissquote Spot XAU/USD
     try:
         url = "https://swissquote.com"
         data = requests.get(url, headers=headers, timeout=6).json()
@@ -95,12 +83,34 @@ def get_live_gold():
     except Exception:
         pass
 
+    # 3. المصدر الفوري الثاني: Gold-API Spot XAU/USD
+    if ounce <= 0:
+        try:
+            r_gold = requests.get("https://gold-api.com", headers=headers, timeout=6).json()
+            ounce = round(float(r_gold.get("price", 0)), 3)
+        except Exception:
+            pass
+
+    # 4. المصدر الفوري الثالث: PAXG-USD (مرتبط بسعر أونصة الذهب الفورية 1:1)
+    if ounce <= 0:
+        try:
+            paxg = yf.Ticker("PAXG-USD").history(period="1d", interval="1m")
+            if not paxg.empty:
+                ounce = round(float(paxg["Close"].iloc[-1]), 3)
+        except Exception:
+            pass
+
+    # حساب التغير اليومي
+    ticker = yf.Ticker("GC=F")
+    hist_1d = ticker.history(period="2d")
+    prev_close = round(float(hist_1d["Close"].iloc[-2]), 3) if len(hist_1d) > 1 else ounce
     if ounce <= 0:
         ounce = round(float(hist_1d["Close"].iloc[-1]), 3)
 
     ch = round(ounce - prev_close, 3) if prev_close else 0.0
     chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
 
+    # حساب أسعار الشراء والبيع في دار السبائك
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
     k22 = round(buy_24k * (22 / 24), 3)
