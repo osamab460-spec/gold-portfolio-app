@@ -5,6 +5,15 @@ from datetime import datetime
 import config
 import services
 
+def _card(title, value, sub="", sub_color="#00E676"):
+    sub_html = f'<div style="color:{sub_color};font-size:0.85rem;font-weight:700;margin-top:2px;">{sub}</div>' if sub else ""
+    return (
+        '<div style="background:#1C1C1E;border:1px solid #2E2E32;border-right:4px solid #E6C25A;border-radius:12px;padding:12px 14px;">'
+        f'<div style="color:#E6C25A;font-size:0.88rem;font-weight:800;margin-bottom:4px;">{title}</div>'
+        f'<div style="color:#FFFFFF;font-size:1.35rem;font-weight:800;">{value}</div>'
+        f'{sub_html}</div>'
+    )
+
 def render_home_and_chart(gold_balance_str, total_cost_str, avg_cost_str, curr_avg, net_pnl_kwd):
     c1, c2, c3 = st.columns(3)
     tf_label = c1.selectbox("الفاصل", ["1 دقيقة", "10 دقائق", "15 دقيقة", "ساعة", "يومي"])
@@ -39,26 +48,15 @@ def render_home_and_chart(gold_balance_str, total_cost_str, avg_cost_str, curr_a
     pnl_color = "#00E676" if net_pnl_kwd >= 0 else "#FF3D00"
     pnl_arrow = "▲" if net_pnl_kwd >= 0 else "▼"
 
-    st.markdown(f"""
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; direction:rtl; margin-top:6px;">
-        <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
-            <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">🪙 رصيد الذهب</div>
-            <div style="color:#FFFFFF; font-size:1.35rem; font-weight:800;">{gold_balance_str} جم</div>
-        </div>
-        <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
-            <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">⚖️ متوسط التكلفة</div>
-            <div style="color:#FFFFFF; font-size:1.35rem; font-weight:800;">{avg_display}</div>
-        </div>
-        <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
-            <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">💰 إجمالي التكلفة</div>
-            <div style="color:#FFFFFF; font-size:1.35rem; font-weight:800;">{total_cost_str} د.ك</div>
-        </div>
-        <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
-            <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">📊 صافي الربح / الخسارة (بيع)</div>
-            <div style="color:{pnl_color}; font-size:1.35rem; font-weight:800;">{pnl_arrow} {net_pnl_kwd:+,.3f} د.ك</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    grid_html = (
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;direction:rtl;margin-top:6px;">'
+        + _card("🪙 رصيد الذهب", f"{gold_balance_str} جم")
+        + _card("⚖️ متوسط التكلفة", avg_display)
+        + _card("💰 إجمالي التكلفة", f"{total_cost_str} د.ك")
+        + _card("📊 صافي الربح / الخسارة", f"{net_pnl_kwd:+,.3f} د.ك", f"{pnl_arrow} سعر البيع الحالي", pnl_color)
+        + "</div>"
+    )
+    st.markdown(grid_html, unsafe_allow_html=True)
 
 def render_buy_zones(sheet_dashboard, ounce, buy_24k, sell_24k, curr_avg, curr_grams):
     st.subheader("🎯 اقتراح أفضل أسعار الشراء")
@@ -96,21 +94,13 @@ def render_calculator_and_zakat(buy_24k, sell_24k, curr_grams, curr_avg):
     diff_color = "#00E676" if diff_avg <= 0 else "#FF3D00"
     diff_arrow = "▼" if diff_avg < 0 else ("▲" if diff_avg > 0 else "•")
 
-    st.markdown(f"""
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; direction:rtl; margin:8px 0 12px 0;">
-        <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
-            <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">⚖️ متوسط التكلفة الجديد</div>
-            <div style="color:#FFFFFF; font-size:1.35rem; font-weight:800;">{new_avg:.3f} د.ك</div>
-            <div style="color:{diff_color}; font-size:0.85rem; font-weight:700; margin-top:2px;">{diff_arrow} {diff_avg:+.3f} د.ك</div>
-        </div>
-        <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
-            <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">🪙 الرصيد الإجمالي الجديد</div>
-            <div style="color:#FFFFFF; font-size:1.35rem; font-weight:800;">{new_grams:.1f} جم</div>
-            <div style="color:#00E676; font-size:0.85rem; font-weight:700; margin-top:2px;">▲ +{sim_grams} جم</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
+    sim_html = (
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;direction:rtl;margin:8px 0 12px 0;">'
+        + _card("⚖️ متوسط التكلفة الجديد", f"{new_avg:.3f} د.ك", f"{diff_arrow} {diff_avg:+.3f} د.ك", diff_color)
+        + _card("🪙 الرصيد الإجمالي الجديد", f"{new_grams:.1f} جم", f"▲ +{sim_grams} جم", "#00E676")
+        + "</div>"
+    )
+    st.markdown(sim_html, unsafe_allow_html=True)
     st.info(f"💰 التكلفة الإجمالية للدفعة الجديدة: **{round(sim_grams * sim_price, 3):,.3f} د.ك** | متوسطك الحالي: **{curr_avg:.3f} د.ك**")
 
     st.divider()
@@ -119,18 +109,13 @@ def render_calculator_and_zakat(buy_24k, sell_24k, curr_grams, curr_avg):
         zakat_grams = round(curr_grams * config.ZAKAT_RATE, 3)
         zakat_kwd = round(zakat_grams * sell_24k, 3)
         st.warning(f"رصيدك ({curr_grams} جم) بلغ النصاب الشرعي (85 جم عيار 24).")
-        st.markdown(f"""
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; direction:rtl; margin-top:8px;">
-            <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
-                <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">🕌 مقدار الزكاة (بالجرام)</div>
-                <div style="color:#FFFFFF; font-size:1.35rem; font-weight:800;">{zakat_grams} جم</div>
-            </div>
-            <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
-                <div style="color:#E6C25A; font-size:0.88rem; font-weight:800; margin-bottom:4px;">💵 قيمة الزكاة النقدية</div>
-                <div style="color:#FFFFFF; font-size:1.35rem; font-weight:800;">{zakat_kwd:,.3f} د.ك</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        zakat_html = (
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;direction:rtl;margin-top:8px;">'
+            + _card("🕌 مقدار الزكاة (بالجرام)", f"{zakat_grams} جم")
+            + _card("💵 قيمة الزكاة النقدية", f"{zakat_kwd:,.3f} د.ك")
+            + "</div>"
+        )
+        st.markdown(zakat_html, unsafe_allow_html=True)
     else:
         st.success(f"رصيدك ({curr_grams} جم) لم يبلغ النصاب الشرعي (85 جم) بعد.")
 
@@ -157,3 +142,23 @@ def render_trade_log(sheet_log):
                 try:
                     p = float(str(price_val).replace(",", ""))
                     g = float(str(grams_val).replace(",", ""))
+                    tot = round(p * g, 3)
+                except ValueError:
+                    tot = 0.0
+                records.append({
+                    "التاريخ": date_val,
+                    "العملية": f"🟢 {op_val}" if "شراء" in op_val else f"🔴 {op_val}",
+                    "السعر (د.ك)": price_val,
+                    "الوزن (جم)": grams_val,
+                    "الإجمالي (د.ك)": f"{tot:,.3f}"
+                })
+        df_log = pd.DataFrame(records)
+        st.dataframe(df_log, use_container_width=True, hide_index=True)
+    else:
+        st.info("لا توجد صفقات مسجلة في السجل حتى الآن.")
+
+    st.divider()
+    if st.button("🗑️ حذف آخر صفقة مسجلة") and len(all_rows) > 1:
+        sheet_log.delete_rows(len(all_rows))
+        st.warning("تم حذف آخر صفقة وتحديث الرصيد!")
+        st.rerun()
