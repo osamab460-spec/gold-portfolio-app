@@ -156,7 +156,8 @@ if page == "🏠 الرئيسية والشموع":
         if not df_candles.empty:
             target_now = buy_24k if unit_code == "KWD" else ounce
             if target_now > 0:
-                diff_val = float(df_candles["Close"].iloc[-1]) - target_now
+                last_close = float(df_candles["Close"].tail(1).item())
+                diff_val = last_close - target_now
                 for col in ["Open", "High", "Low", "Close"]:
                     df_candles[col] = (df_candles[col] - diff_val).round(3 if unit_code == "KWD" else 2)
 
@@ -170,10 +171,11 @@ if page == "🏠 الرئيسية والشموع":
             if unit_code == "KWD" and curr_avg > 0:
                 fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
             for r in sheet_alerts.get_all_values()[1:]:
-                if len(r) >= 4 and str(r[3]).strip().upper() == "ON":
-                    t_usd = float(str(r[1]).replace(",", ""))
-                    y_line = round((t_usd / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3) if unit_code == "KWD" else t_usd
-                    l_color = "#00E676" if str(r[2]).strip() == "DOWN" else "#29B6F6"
+                if len(r) >= 4:
+                    _, p_cell, d_cell, s_cell = r[:4]
+                    if str(s_cell).strip().upper() == "ON":
+                        t_usd = float(str(p_cell).replace(",", ""))
+                        y_line = round((t_usd / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3) if unit_code == "KWD" else t_usd
     elif page == "🔔 التنبيهات":
     st.subheader("⚡ إضافة سريعة بالنسب المئوية")
     pct_choice = st.select_slider("اختر نسبة التحرك (%)", options=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0], value=1.5)
@@ -222,8 +224,10 @@ if page == "🏠 الرئيسية والشموع":
         disp = []
         for idx, r in enumerate(alert_rows[1:], start=2):
             if len(r) >= 4:
+                _, p_c, d_c, s_c = r[:4]
+                q_c = r[4] if len(r) > 4 else "0"
                 try:
-                    u_v = float(str(r[1]).replace(",", ""))
+                    u_v = float(str(p_c).replace(",", ""))
                     k_v = round((u_v / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
                     rem = round(((u_v - ounce) / ounce) * 100, 2) if ounce > 0 else 0.0
                 except Exception:
@@ -233,9 +237,9 @@ if page == "🏠 الرئيسية والشموع":
                     "الأونصة": f"{u_v:,.2f}$",
                     "الجرام": f"{k_v:.3f}",
                     "المتبقي": f"{rem:+.1f}%",
-                    "النوع": "📉 شراء" if str(r[2]).strip() == "DOWN" else "📈 بيع",
-                    "الحالة": "🟢 نشط" if str(r[3]).strip().upper() == "ON" else "✅ منفّذ",
-                    "الكمية": r[4] if len(r) > 4 else "0"
+                    "النوع": "📉 شراء" if str(d_c).strip() == "DOWN" else "📈 بيع",
+                    "الحالة": "🟢 نشط" if str(s_c).strip().upper() == "ON" else "✅ منفّذ",
+                    "الكمية": q_c
                 })
         st.dataframe(pd.DataFrame(disp), use_container_width=True, hide_index=True)
 
@@ -246,9 +250,11 @@ if page == "🏠 الرئيسية والشموع":
             st.rerun()
         if b2.button("✅ تسجيل كصفقة"):
             rd = alert_rows[int(sel_row) - 1]
-            t_k = round((float(str(rd[1]).replace(",", "")) / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
-            t_g = float(str(rd[4]).replace(",", "")) if (len(rd) > 4 and float(rd[4] or 0) > 0) else 10.0
-            sheet_log.append_row([datetime.now(config.KUWAIT_TZ).strftime("%Y-%m-%d"), "شراء" if str(rd[2]).strip() == "DOWN" else "بيع", t_k, t_g], value_input_option="USER_ENTERED")
+            _, p_c, d_c, _ = rd[:4]
+            q_c = rd[4] if len(rd) > 4 else "10"
+            t_k = round((float(str(p_c).replace(",", "")) / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
+            t_g = float(str(q_c).replace(",", "")) if float(q_c or 0) > 0 else 10.0
+            sheet_log.append_row([datetime.now(config.KUWAIT_TZ).strftime("%Y-%m-%d"), "شراء" if str(d_c).strip() == "DOWN" else "بيع", t_k, t_g], value_input_option="USER_ENTERED")
             sheet_alerts.update_acell(f"D{int(sel_row)}", "TRIGGERED")
             st.success("تم تسجيل الصفقة!")
         if b3.button("🗑️ حذف"):
@@ -313,7 +319,7 @@ elif page == "📜 السجل":
         records = []
         for r in reversed(all_rows[1:]):
             if len(r) >= 4:
-                d_s, t_s, p_s, w_s = r[0], r[1], r[2], r[3]
+                d_s, t_s, p_s, w_s = r[:4]
                 try:
                     tot = round(float(str(p_s).replace(",", "")) * float(str(w_s).replace(",", "")), 3)
                 except ValueError:
