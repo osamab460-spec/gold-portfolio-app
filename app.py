@@ -1,4 +1,5 @@
 import streamlit as st
+import plotly.graph_objects as go
 from datetime import datetime
 import config
 import services
@@ -10,12 +11,84 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# ================= تصميم واجهة فخمة (Gold & Dark Theme) =================
 st.markdown("""
 <style>
+    /* خلفية داكنة فخمة واتجاه عربي */
+    .stApp {
+        background-color: #0E1117;
+        color: #F5F5F5;
+    }
     .main { direction: rtl; text-align: right; }
-    div[data-testid="stMetricValue"] { font-size: 1.3rem; }
-    .stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: bold; }
-    div[role="radiogroup"] { direction: rtl; justify-content: center; gap: 6px; }
+    
+    /* تنسيق العنوان الرئيسي */
+    .gold-header {
+        background: linear-gradient(135deg, #1E2129 0%, #14171F 100%);
+        border: 1px solid #D4AF37;
+        border-radius: 16px;
+        padding: 16px;
+        text-align: center;
+        margin-bottom: 18px;
+        box-shadow: 0 4px 15px rgba(212, 175, 55, 0.15);
+    }
+    .gold-header h1 {
+        color: #FFD700;
+        font-size: 1.65rem;
+        margin: 0;
+        font-weight: 800;
+    }
+    .gold-header p {
+        color: #A0AAB5;
+        font-size: 0.85rem;
+        margin: 4px 0 0 0;
+    }
+
+    /* بطاقات المؤشرات */
+    div[data-testid="stMetric"] {
+        background-color: #161A23;
+        border: 1px solid #2A303E;
+        border-right: 4px solid #D4AF37;
+        border-radius: 12px;
+        padding: 12px 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    div[data-testid="stMetricLabel"] {
+        color: #9BA3AF !important;
+        font-size: 0.85rem !important;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #FFFFFF !important;
+        font-size: 1.3rem !important;
+        font-weight: 700 !important;
+    }
+
+    /* الأزرار الذهبية */
+    .stButton>button {
+        width: 100%;
+        background: linear-gradient(90deg, #C59B27 0%, #E5C158 100%);
+        color: #0E1117 !important;
+        border: none;
+        border-radius: 12px;
+        height: 3.1em;
+        font-weight: 800;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+    }
+    .stButton>button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+    }
+
+    /* شريط التنقل */
+    div[role="radiogroup"] {
+        direction: rtl;
+        justify-content: center;
+        background-color: #161A23;
+        padding: 8px;
+        border-radius: 14px;
+        border: 1px solid #2A303E;
+        gap: 6px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -33,9 +106,14 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.title("🔐 محفظة دار السبائك AI")
+    st.markdown("""
+    <div class="gold-header">
+        <h1>🔐 محفظة دار السبائك AI</h1>
+        <p>نظام إدارة واستثمار الذهب الذكي • الكويت</p>
+    </div>
+    """, unsafe_allow_html=True)
     pin_input = st.text_input("أدخل الرقم السري للدخول", type="password", max_chars=8)
-    if st.button("دخول المحفظة"):
+    if st.button("🔓 فتح المحفظة"):
         if pin_input == str(APP_PIN):
             st.session_state.authenticated = True
             st.rerun()
@@ -43,8 +121,13 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-# ================= 2. شريط الأسعار الحية =================
-st.title("🪙 محفظة دار السبائك AI")
+# ================= 2. الترويسة وشريط الأسعار الحية =================
+st.markdown("""
+<div class="gold-header">
+    <h1>🪙 محفظة دار السبائك AI</h1>
+    <p>متابعة لحظية • تحليل فني • إدارة سيولة</p>
+</div>
+""", unsafe_allow_html=True)
 
 try:
     ounce, ch, chp, buy_24k, sell_24k = services.get_live_gold()
@@ -59,7 +142,7 @@ except Exception as e:
     ounce, buy_24k, sell_24k = 0, 0, 0
     st.warning(f"تنبيه السعر الحي: {e}")
 
-# قراءة بيانات المحفظة الأساسية للاستخدام في جميع الصفحات
+# قراءة بيانات المحفظة الأساسية
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 market_val_str = sheet_dashboard.acell("C15").value or "0"
@@ -71,20 +154,20 @@ try:
 except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
-st.divider()
+st.write("")
 
-# ================= 3. شريط التنقل الذكي للموبايل (بديل التبويبات) =================
+# ================= 3. شريط التنقل الاحترافي =================
 page = st.radio(
     "اختر القسم:",
-    ["📊 المحفظة", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"],
+    ["📊 المحفظة والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"],
     horizontal=True,
     label_visibility="collapsed"
 )
 
-st.divider()
+st.write("")
 
-# --- الصفحة 1: موقف المحفظة والرسم البياني ---
-if page == "📊 المحفظة":
+# --- الصفحة 1: موقف المحفظة وشارت الشموع التفاعلي ---
+if page == "📊 المحفظة والشموع":
     c1, c2 = st.columns(2)
     c1.metric("رصيد الذهب", f"{gold_balance_str} جم")
     c2.metric("متوسط التكلفة", f"{avg_cost_str} د.ك")
@@ -93,14 +176,78 @@ if page == "📊 المحفظة":
     c3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
     c4.metric("القيمة السوقية", f"{market_val_str}")
 
-    st.subheader("📈 حركة سعر جرام 24 (آخر 30 يوماً)")
+    st.subheader("🕯️ شارت الشموع اليابانية التفاعلي")
+    
+    # أدوات التحكم وتحرير الشارت
+    ctrl1, ctrl2, ctrl3 = st.columns(3)
+    with ctrl1:
+        tf_label = st.selectbox("الإطار الزمني", ["يومي (شهرين)", "ساعي (7 أيام)", "ربع ساعة (يومين)"])
+        tf_map = {"يومي (شهرين)": "1d", "ساعي (7 أيام)": "1h", "ربع ساعة (يومين)": "15m"}
+    with ctrl2:
+        unit_label = st.selectbox("العملة", ["دينار كويتي (جرام 24)", "دولار أمريكي (الأونصة)"])
+        unit_code = "KWD" if "كويتي" in unit_label else "USD"
+    with ctrl3:
+        show_avg = st.checkbox("إظهار خط متوسط تكلفتي", value=True)
+        show_sma = st.checkbox("إظهار المتوسط المتحرك (MA10)", value=True)
+
     try:
-        chart_df, _ = services.get_chart_and_technicals()
-        if curr_avg > 0:
-            chart_df["متوسط تكلفتك (د.ك)"] = curr_avg
-        st.line_chart(chart_df)
-    except Exception:
-        st.info("جاري تحميل بيانات الرسم البياني...")
+        df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
+        
+        fig = go.Figure(data=[go.Candlestick(
+            x=df_candles.index,
+            open=df_candles["Open"],
+            high=df_candles["High"],
+            low=df_candles["Low"],
+            close=df_candles["Close"],
+            increasing_line_color="#00C853",
+            decreasing_line_color="#FF3D00",
+            name="السعر"
+        )])
+
+        # إضافة خط متوسط التكلفة إذا كانت العملة دينار كويتي
+        if show_avg and unit_code == "KWD" and curr_avg > 0:
+            fig.add_hline(
+                y=curr_avg,
+                line_dash="dash",
+                line_color="#FFD700",
+                line_width=2,
+                annotation_text=f"متوسط تكلفتك: {curr_avg:.3f} د.ك",
+                annotation_position="top right",
+                annotation_font_color="#FFD700"
+            )
+
+        # إضافة خط المتوسط المتحرك السريع
+        if show_sma and len(df_candles) >= 10:
+            sma10 = df_candles["Close"].rolling(window=10).mean()
+            fig.add_trace(go.Scatter(
+                x=df_candles.index,
+                y=sma10,
+                mode="lines",
+                line=dict(color="#29B6F6", width=1.5),
+                name="MA 10"
+            ))
+
+        fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="#161A23",
+            plot_bgcolor="#0E1117",
+            height=420,
+            margin=dict(l=10, r=10, t=30, b=10),
+            xaxis_rangeslider_visible=False,
+            dragmode="pan",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+
+        # تفعيل شريط أدوات التحرير والرسم فوق الشارت (رسم خطوط، تكبير، تصوير)
+        plotly_config = {
+            "displayModeBar": True,
+            "scrollZoom": True,
+            "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]
+        }
+        st.plotly_chart(fig, use_container_width=True, config=plotly_config)
+        st.caption("💡 يمكنك لمس الشموع لعرض التفاصيل، أو استخدام أدوات الرسم أعلى الشارت لرسم خطوط الدعم والمقاومة.")
+    except Exception as e:
+        st.info(f"جاري تحميل بيانات الشموع: {e}")
 
     if st.button("🔄 تحديث البيانات والأسعار"):
         st.rerun()
@@ -142,53 +289,3 @@ elif page == "🧮 الحاسبة والزكاة":
         old_total = curr_grams * curr_avg
         new_total = old_total + (sim_grams * sim_price)
         new_grams = curr_grams + sim_grams
-        new_avg = round(new_total / new_grams, 3)
-        diff_avg = round(new_avg - curr_avg, 3)
-
-        m1, m2 = st.columns(2)
-        m1.metric("متوسط التكلفة الجديد", f"{new_avg:.3f} د.ك", f"{diff_avg:+.3f} د.ك", delta_color="inverse")
-        m2.metric("الرصيد الإجمالي الجديد", f"{new_grams:.1f} جم", f"+{sim_grams} جم")
-        st.info(f"💰 التكلفة الإجمالية للدفعة الجديدة: **{round(sim_grams * sim_price, 3):,.3f} د.ك**")
-    else:
-        st.warning("تأكد من وجود رصيد ذهب في المحفظة لحساب المتوسط الجديد.")
-
-    st.divider()
-    st.subheader("🕌 حاسبة زكاة الذهب التلقائية")
-    if curr_grams >= config.ZAKAT_NISAB_GRAMS:
-        zakat_grams = round(curr_grams * config.ZAKAT_RATE, 3)
-        zakat_kwd = round(zakat_grams * sell_24k, 3)
-        st.warning(f"رصيدك ({curr_grams} جم) بلغ النصاب الشرعي (85 جم عيار 24).")
-        z1, z2 = st.columns(2)
-        z1.metric("مقدار الزكاة (بالجرام)", f"{zakat_grams} جم")
-        z2.metric("قيمة الزكاة النقدية", f"{zakat_kwd:,.3f} د.ك")
-    else:
-        st.success(f"رصيدك ({curr_grams} جم) لم يبلغ النصاب الشرعي (85 جم) بعد.")
-
-# --- الصفحة 4: تسجيل صفقة جديدة ---
-elif page == "➕ صفقة":
-    st.subheader("➕ تسجيل صفقة في دار السبائك")
-    op_type = st.radio("نوع العملية", ["شراء", "بيع"], horizontal=True)
-    grams = st.number_input("الوزن (بالجرام)", min_value=0.1, step=1.0, format="%.2f")
-    price_input = st.number_input("سعر الجرام أو إجمالي الفاتورة (د.ك)", min_value=0.001, step=0.1, format="%.3f")
-
-    if st.button("✅ تسجيل العملية الآن"):
-        final_price = round(price_input / grams, 4) if price_input > 150 else price_input
-        today_str = datetime.now(config.KUWAIT_TZ).strftime("%Y-%m-%d")
-        sheet_log.append_row([today_str, op_type, final_price, grams], value_input_option="USER_ENTERED")
-        st.success(f"تم تسجيل {op_type} {grams} جم بسعر {final_price} د.ك بنجاح!")
-
-# --- الصفحة 5: سجل العمليات والحذف ---
-elif page == "📜 السجل":
-    st.subheader("📜 آخر 5 صفقات مسجلة")
-    all_rows = sheet_log.get_all_values()
-    last_5 = list(reversed(all_rows))[:5]
-    for r in last_5:
-        if len(r) >= 4 and r[0] != "التاريخ":
-            st.write(" • ".join(r[:4]))
-
-    st.divider()
-    if st.button("🗑️ حذف آخر صفقة مسجلة"):
-        if len(all_rows) > 1:
-            sheet_log.delete_rows(len(all_rows))
-            st.warning("تم حذف آخر صفقة وتحديث الرصيد!")
-            st.rerun()
