@@ -11,7 +11,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ================= تنسيق مطابق لواجهة دار السبائك =================
 st.markdown("""
 <style>
     .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
@@ -21,7 +20,6 @@ st.markdown("""
     .main { direction: rtl; text-align: right; }
     p, span, label, div, h1, h2, h3, h4 { color: #F5F5F5 !important; }
 
-    /* ترويسة دار السبائك الذهبية */
     .sabaek-top {
         display: flex;
         justify-content: space-between;
@@ -37,7 +35,6 @@ st.markdown("""
         letter-spacing: 0.5px;
     }
 
-    /* بطاقة الأونصة العالمية */
     .gold-ticker-box {
         background-color: #1C1C1E;
         border: 1px solid #2E2E32;
@@ -61,7 +58,6 @@ st.markdown("""
         margin-top: 6px;
     }
 
-    /* شريط العيارات الأربعة (24 - 22 - 21 - 18) */
     .karats-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -88,7 +84,6 @@ st.markdown("""
         font-weight: 800;
     }
 
-    /* ألوان تغير السعر التلقائية */
     .price-up { color: #00E676 !important; }
     .price-down { color: #FF3D00 !important; }
     .price-same {
@@ -98,7 +93,6 @@ st.markdown("""
         border-radius: 6px;
     }
 
-    /* بطاقات المحفظة */
     div[data-testid="stMetric"] {
         background-color: #1C1C1E !important;
         border: 1px solid #2E2E32 !important;
@@ -109,7 +103,6 @@ st.markdown("""
     div[data-testid="stMetricLabel"] p { color: #E6C25A !important; font-size: 0.85rem !important; }
     div[data-testid="stMetricValue"] div { color: #FFFFFF !important; font-size: 1.25rem !important; }
 
-    /* الأزرار الذهبية */
     .stButton>button {
         width: 100%;
         background: linear-gradient(90deg, #D4AF37 0%, #F3D06B 100%) !important;
@@ -119,7 +112,6 @@ st.markdown("""
     }
     .stButton>button p { color: #121212 !important; font-weight: 800 !important; font-size: 1rem !important; }
 
-    /* شريط التنقل السفلي/العلوي */
     div[role="radiogroup"] {
         direction: rtl;
         justify-content: center;
@@ -135,13 +127,11 @@ st.markdown("""
 
 sheet_dashboard, sheet_log = services.init_sheets()
 
-# ================= التحقق من رابط الجدولة التلقائية =================
 if st.query_params.get("cron") == "run":
     services.generate_and_send_report(sheet_dashboard, send_notifications=True)
     st.success("CRON_OK")
     st.stop()
 
-# ================= 1. شاشة قفل الحماية برقم سري (PIN) =================
 APP_PIN = st.secrets.get("APP_PIN", "1234")
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -157,7 +147,6 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-# ================= 2. قسم الأسعار الحية المتجدد تلقائياً كل 15 ثانية =================
 @st.fragment(run_every=15)
 def live_sabaek_ticker_and_chart():
     try:
@@ -168,12 +157,10 @@ def live_sabaek_ticker_and_chart():
         sell_24k = data["sell_24k"]
         k22, k21, k18 = data["k22"], data["k21"], data["k18"]
 
-        # حفظ القيم في session_state للاستخدام في باقي الصفحة
         st.session_state["live_ounce"] = ounce
         st.session_state["live_buy_24k"] = buy_24k
         st.session_state["live_sell_24k"] = sell_24k
 
-        # مقارنة السعر الحالي بالسعر في التحديث السابق لتحديد اللون (أخضر / أحمر / أسود)
         prev_ounce = st.session_state.get("prev_tick_ounce", ounce)
         if ounce > prev_ounce:
             color_cls = "price-up"
@@ -189,7 +176,6 @@ def live_sabaek_ticker_and_chart():
         if ounce > 0:
             sheet_dashboard.update_acell("C5", ounce)
 
-        # الترويسة وشريط الأونصة
         st.markdown(f"""
         <div class="sabaek-top">
             <span class="sabaek-logo">🪙 دار السبائك AI</span>
@@ -205,7 +191,6 @@ def live_sabaek_ticker_and_chart():
         </div>
         """, unsafe_allow_html=True)
 
-        # شريط العيارات الأربعة المطابق للصورة (عيار 24، 22، 21، 18)
         st.markdown(f"""
         <div class="karats-grid">
             <div class="karat-item">
@@ -230,14 +215,12 @@ def live_sabaek_ticker_and_chart():
     except Exception as e:
         st.warning(f"جاري مزامنة السعر اللحظي: {e}")
 
-# تشغيل شريط الأسعار الحي المتجدد تلقائياً
 live_sabaek_ticker_and_chart()
 
 ounce = st.session_state.get("live_ounce", 0.0)
 buy_24k = st.session_state.get("live_buy_24k", 0.0)
 sell_24k = st.session_state.get("live_sell_24k", 0.0)
 
-# قراءة بيانات المحفظة من Google Sheets
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 market_val_str = sheet_dashboard.acell("C15").value or "0"
@@ -249,7 +232,6 @@ try:
 except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
-# ================= 3. شريط التنقل السفلي/العلوي =================
 page = st.radio(
     "القائمة",
     ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"],
@@ -259,9 +241,7 @@ page = st.radio(
 
 st.write("")
 
-# --- الصفحة 1: الرئيسية + شارت الشموع الاحترافي + بطاقات المحفظة ---
 if page == "🏠 الرئيسية والشموع":
-    # أدوات تحرير الشارت
     c_tf, c_unit, c_opt = st.columns(3)
     with c_tf:
         tf_label = st.selectbox("الفاصل الزمني", ["15 دقيقة", "10 دقائق", "ساعة", "يومي"])
@@ -275,7 +255,7 @@ if page == "🏠 الرئيسية والشموع":
 
     try:
         df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
-        
+
         if chart_style == "شموع يابانية 🕯️":
             trace = go.Candlestick(
                 x=df_candles.index,
@@ -288,3 +268,34 @@ if page == "🏠 الرئيسية والشموع":
                 name="السعر"
             )
         else:
+            trace = go.Scatter(
+                x=df_candles.index,
+                y=df_candles["Close"],
+                mode="lines+markers",
+                line=dict(color="#E6C25A", width=2.5),
+                marker=dict(size=5, color="#FFD700"),
+                fill="tozeroy",
+                fillcolor="rgba(230, 194, 90, 0.12)",
+                name="السعر"
+            )
+
+        fig = go.Figure(data=[trace])
+
+        if show_avg and unit_code == "KWD" and curr_avg > 0:
+            fig.add_hline(
+                y=curr_avg,
+                line_dash="dash",
+                line_color="#FFD700",
+                line_width=1.8,
+                annotation_text=f"متوسط تكلفتك: {curr_avg:.3f} د.ك",
+                annotation_position="top right",
+                annotation_font_color="#FFD700"
+            )
+
+        fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="#1C1C1E",
+            plot_bgcolor="#141416",
+            height=380,
+            margin=dict(l=8, r=8, t=25, b=8),
+            xaxis_rangeslider_visible=False,
