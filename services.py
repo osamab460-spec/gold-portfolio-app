@@ -83,7 +83,7 @@ def get_live_gold():
     ch = round(ounce - prev_close, 3)
     chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
 
-    # محرك تسعير دار السبائك الموحد
+    # محرك تسعير دار السبائك الموحد (0.31699 وفرق بيع 0.295)
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3) if buy_24k > 0 else 0.0
     k22 = round(buy_24k * (22 / 24), 3)
@@ -111,7 +111,6 @@ def get_candlestick_data(timeframe="1m", unit="KWD"):
     if timeframe == "1m":
         hist = ticker.history(period="1d", interval="1m").tail(60)
     elif timeframe == "10m":
-        # جلب 5 دقائق وتجميعها بدقة إلى شموع 10 دقائق (Resample 10min)
         raw_5m = ticker.history(period="2d", interval="5m")
         if not raw_5m.empty:
             hist = raw_5m.resample("10min").agg({
@@ -134,7 +133,6 @@ def get_candlestick_data(timeframe="1m", unit="KWD"):
 
     df = hist[["Open", "High", "Low", "Close"]].dropna().copy()
 
-    # معايرة الشموع مع السعر الفوري لإزالة فجوة العقود الآجلة
     if not df.empty and spot_ounce > 0:
         futures_last = float(df["Close"].iloc[-1])
         spread_offset = futures_last - spot_ounce
