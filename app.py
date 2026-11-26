@@ -23,9 +23,19 @@ st.markdown("""
     .price-up { color: #00E676; }
     .price-down { color: #FF3D00; }
     .price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }
-    div[data-testid="stMetric"] { background-color: #1C1C1E; border: 1px solid #2E2E32; border-right: 4px solid #E6C25A; border-radius: 12px; padding: 10px 12px; }
+    
+    /* تلوين بطاقات ملخص المحفظة بالأبيض والذهبي بوضوح تام */
+    div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
+    div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] { color: #E6C25A !important; font-weight: 700 !important; }
+    div[data-testid="stMetricValue"] div, div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 800 !important; }
+
+    /* تلوين قائمة الاختيارات بالأبيض الناصع على الخلفية السوداء */
+    div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
+    div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; font-weight: 700 !important; }
+    div[data-baseweb="select"] > div { background-color: #1C1C1E !important; color: #FFFFFF !important; }
+    div[data-baseweb="select"] span { color: #FFFFFF !important; }
+
     .stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: 800; }
-    div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
 </style>
 """, unsafe_allow_html=True)
 
