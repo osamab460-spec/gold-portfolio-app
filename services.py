@@ -23,7 +23,6 @@ def get_live_gold():
     headers = {"User-Agent": "Mozilla/5.0"}
     ounce = 0.0
 
-    # 1. جلب السعر الفوري الحقيقي (Spot XAU/USD) المطابق لتسعيرة دار السبائك
     try:
         url = "https://swissquote.com"
         data = requests.get(url, headers=headers, timeout=6).json()
@@ -36,7 +35,6 @@ def get_live_gold():
     except Exception:
         pass
 
-    # حساب التغير اليومي من إغلاق الأمس
     ticker = yf.Ticker("GC=F")
     hist_1d = ticker.history(period="2d")
     prev_close = round(float(hist_1d["Close"].iloc[-2]), 3) if len(hist_1d) > 1 else ounce
@@ -47,7 +45,6 @@ def get_live_gold():
     ch = round(ounce - prev_close, 3)
     chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
 
-    # حساب أسعار الشراء والبيع في الكويت (دار السبائك)
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
     k22 = round(buy_24k * (22 / 24), 3)
@@ -65,10 +62,13 @@ def get_live_gold():
         "k18": k18
     }
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=30)
 def get_candlestick_data(timeframe="15m", unit="KWD"):
     ticker = yf.Ticker("GC=F")
-    if timeframe == "10m":
+    if timeframe == "1m":
+        # جلب آخر 60 شمعة بفاصل دقيقة واحدة
+        hist = ticker.history(period="1d", interval="1m").tail(60)
+    elif timeframe == "10m":
         hist = ticker.history(period="1d", interval="5m").tail(48)
     elif timeframe == "15m":
         hist = ticker.history(period="2d", interval="15m").tail(60)
