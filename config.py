@@ -12,7 +12,7 @@ RSS_NEWS_URL = "https:" + SLASH + SLASH + "://google.com" + SLASH + "rss" + SLAS
 
 # ================= معادلات التسعير والزكاة (الكويت - دار السبائك) =================
 OUNCE_TO_GRAM = 31.1035
-KUWAIT_FACTOR = 0.31805
+KUWAIT_FACTOR = 0.31699
 SELL_SPREAD_KWD = 0.295
 ZAKAT_NISAB_GRAMS = 85.0
 ZAKAT_RATE = 0.025
