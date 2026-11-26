@@ -13,6 +13,7 @@ st.markdown("""
     p, span, label, div, h1, h2, h3, h4 { color: #F5F5F5 !important; }
     div[data-testid="stAlert"] { background-color: #1C1C1E !important; border: 1px solid #E6C25A !important; border-radius: 12px; }
     div[data-baseweb="select"] > div, input, textarea { background-color: #1C1C1E !important; color: #FFFFFF !important; border-color: #333333 !important; }
+    ul[role="listbox"], li[role="option"] { background-color: #1C1C1E !important; color: #FFFFFF !important; }
     .sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 14px 4px; border-bottom: 1px solid #2A2A2A; margin-bottom: 14px; }
     .sabaek-logo { color: #E6C25A !important; font-size: 1.7rem !important; font-weight: 900 !important; }
     .gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; direction: ltr; text-align: left; }
