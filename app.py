@@ -20,7 +20,7 @@ st.markdown("""
     .karat-name { color: #B0B0B0; font-size: 0.85rem; margin-bottom: 4px; }
     .karat-val { font-size: 1.02rem; font-weight: 800; }
     .price-up { color: #00E676; }
-    .price-down { color: #FF3D00; }
+    div[data-testid="stMetricLabel"], div[data-testid="stMetricLabel"] * { color: #E6C25A !important; font-weight: 800 !important; opacity: 1 !important; }
     .price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }
     div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
     div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] label, div[data-testid="stMetricLabel"] { color: #E6C25A !important; font-weight: 700 !important; opacity: 1 !important; }
