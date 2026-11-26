@@ -19,37 +19,22 @@ def init_sheets():
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
 def get_live_gold():
-    # جلب أحدث سعر لحظي بدقة دقيقة واحدة (1m) لضمان التغير التلقائي السريع
     ticker = yf.Ticker("GC=F")
     hist_1m = ticker.history(period="1d", interval="1m")
     hist_1d = ticker.history(period="2d")
 
-    if not hist_1m.empty:
-        ounce = round(float(hist_1m["Close"].iloc[-1]), 3)
-    else:
-        ounce = round(float(hist_1d["Close"].iloc[-1]), 3)
-
+    ounce = round(float(hist_1m["Close"].iloc[-1]), 3) if not hist_1m.empty else round(float(hist_1d["Close"].iloc[-1]), 3)
     prev_close = round(float(hist_1d["Close"].iloc[-2]), 3) if len(hist_1d) > 1 else ounce
     ch = round(ounce - prev_close, 3)
     chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
 
-    # حساب أسعار العيارات في الكويت (دار السبائك)
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
     k22 = round(buy_24k * (22 / 24), 3)
     k21 = round(buy_24k * (21 / 24), 3)
     k18 = round(buy_24k * (18 / 24), 3)
 
-    return {
-        "ounce": ounce,
-        "ch": ch,
-        "chp": chp,
-        "buy_24k": buy_24k,
-        "sell_24k": sell_24k,
-        "k22": k22,
-        "k21": k21,
-        "k18": k18
-    }
+    return {"ounce": ounce, "ch": ch, "chp": chp, "buy_24k": buy_24k, "sell_24k": sell_24k, "k22": k22, "k21": k21, "k18": k18}
 
 def get_candlestick_data(timeframe="15m", unit="KWD"):
     ticker = yf.Ticker("GC=F")
@@ -64,8 +49,7 @@ def get_candlestick_data(timeframe="15m", unit="KWD"):
 
     df = hist[["Open", "High", "Low", "Close"]].copy()
     if unit == "KWD":
-        factor = config.KUWAIT_FACTOR / config.OUNCE_TO_GRAM
-        df = (df * factor).round(3)
+        df = (df * (config.KUWAIT_FACTOR / config.OUNCE_TO_GRAM)).round(3)
     else:
         df = df.round(2)
     return df
