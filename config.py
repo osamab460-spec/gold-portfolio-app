@@ -1,3 +1,4 @@
+import os
 import pytz
 import streamlit as st
 
@@ -5,7 +6,6 @@ def _get_secret(key, default=""):
     try:
         return str(st.secrets.get(key, default)).strip()
     except Exception:
-        import os
         return str(os.environ.get(key, default)).strip()
 
 # ================= الإعدادات الأساسية =================
