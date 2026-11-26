@@ -9,26 +9,26 @@ st.set_page_config(page_title="دار السبائك AI", page_icon="🪙", layo
 
 st.markdown("""
 <style>
-    .main { direction: rtl; text-align: right; }
-    .sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 12px 4px; border-bottom: 1px solid #2E2E32; margin-bottom: 12px; }
-    .sabaek-logo { color: #E6C25A; font-size: 1.65rem; font-weight: 900; }
-    .gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; direction: ltr; text-align: left; }
-    .gold-ticker-title { color: #E6C25A; font-weight: 800; font-size: 1rem; display: flex; justify-content: space-between; }
-    .gold-ticker-price { font-size: 1.45rem; font-weight: 800; margin-top: 6px; }
-    .karats-grid { display: grid; grid-template-columns: repeat(4, 1fr); background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 12px 6px; margin-bottom: 14px; text-align: center; direction: rtl; }
-    .karat-item { border-left: 1px solid #2E2E32; padding: 0 4px; }
-    .karat-item:last-child { border-left: none; }
-    .karat-name { color: #B0B0B0; font-size: 0.85rem; margin-bottom: 4px; }
-    .karat-val { font-size: 1.02rem; font-weight: 800; }
-    .price-up { color: #00E676; }
-    .price-down { color: #FF3D00; }
-    .price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }
-    div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
-    div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] { color: #E6C25A !important; font-weight: 700 !important; }
-    div[data-testid="stMetricValue"] div, div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 800 !important; }
-    div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
-    div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; font-weight: 700 !important; }
-    .stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: 800; }
+.main { direction: rtl; text-align: right; }
+.sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 12px 4px; border-bottom: 1px solid #2E2E32; margin-bottom: 12px; }
+.sabaek-logo { color: #E6C25A; font-size: 1.65rem; font-weight: 900; }
+.gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; direction: ltr; text-align: left; }
+.gold-ticker-title { color: #E6C25A; font-weight: 800; font-size: 1rem; display: flex; justify-content: space-between; }
+.gold-ticker-price { font-size: 1.45rem; font-weight: 800; margin-top: 6px; }
+.karats-grid { display: grid; grid-template-columns: repeat(4, 1fr); background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 12px 6px; margin-bottom: 14px; text-align: center; direction: rtl; }
+.karat-item { border-left: 1px solid #2E2E32; padding: 0 4px; }
+.karat-item:last-child { border-left: none; }
+.karat-name { color: #B0B0B0; font-size: 0.85rem; margin-bottom: 4px; }
+.karat-val { font-size: 1.02rem; font-weight: 800; }
+.price-up { color: #00E676; }
+.price-down { color: #FF3D00; }
+.price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }
+div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
+div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] { color: #E6C25A !important; font-weight: 700 !important; }
+div[data-testid="stMetricValue"] div, div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 800 !important; }
+div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
+div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; font-weight: 700 !important; }
+.stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: 800; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -104,7 +104,8 @@ gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 avg_cost_str = sheet_dashboard.acell("D15").value or "0"
 try:
-    curr_grams, curr_avg = float(gold_balance_str.replace(",", "")), float(avg_cost_str.replace(",", ""))
+    curr_grams = float(gold_balance_str.replace(",", ""))
+    curr_avg = float(avg_cost_str.replace(",", ""))
 except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
@@ -114,16 +115,16 @@ st.write("")
 
 if page != "🏠 الرئيسية والشموع":
     st.markdown("""<style>
-        .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] { background-color: #FFFFFF !important; color: #111111 !important; }
-        h1, h2, h3, h4, p, span, label, div, .stMarkdown { color: #111111 !important; }
-        .gold-ticker-box span, .karats-grid .karat-name { color: #E0E0E0 !important; }
-        .gold-ticker-title span:first-child { color: #E6C25A !important; }
-        .price-up { color: #00E676 !important; }
-        .price-down { color: #FF3D00 !important; }
-        div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; }
-        input, textarea, div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { background-color: #F4F5F7 !important; color: #111111 !important; border: 1px solid #CCCCCC !important; }
-        div[data-testid="stAlert"] { background-color: #F8F9FA !important; border: 1px solid #D4AF37 !important; }
-        .stButton>button { background-color: #E6C25A !important; color: #111111 !important; }
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] { background-color: #FFFFFF !important; color: #111111 !important; }
+    h1, h2, h3, h4, p, span, label, div, .stMarkdown { color: #111111 !important; }
+    .gold-ticker-box span, .karats-grid .karat-name { color: #E0E0E0 !important; }
+    .gold-ticker-title span:first-child { color: #E6C25A !important; }
+    .price-up { color: #00E676 !important; }
+    .price-down { color: #FF3D00 !important; }
+    div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; }
+    input, textarea, div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { background-color: #F4F5F7 !important; color: #111111 !important; border: 1px solid #CCCCCC !important; }
+    div[data-testid="stAlert"] { background-color: #F8F9FA !important; border: 1px solid #D4AF37 !important; }
+    .stButton>button { background-color: #E6C25A !important; color: #111111 !important; }
     </style>""", unsafe_allow_html=True)
 
 if page == "🏠 الرئيسية والشموع":
@@ -146,10 +147,8 @@ if page == "🏠 الرئيسية والشموع":
                 fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
             for r in sheet_alerts.get_all_values()[1:]:
                 if len(r) >= 4 and str(r[3]).strip().upper() == "ON":
-                    try:
-                        t_usd = float(str(r[1]).replace(",", ""))
-                        y_line = round((t_usd / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3) if unit_code == "KWD" else t_usd
-                        l_color = "#00E676" if r[2] == "DOWN" else "#29B6F6"
-                        fig.add_hline(y=y_line, line_dash="dot", line_color=l_color, line_width=1.4, annotation_text=f"🔔 {y_line}", annotation_position="bottom left", annotation_font_color=l_color)
-                    except Exception:
-                        pass
+                    t_usd = float(str(r[1]).replace(",", ""))
+                    y_line = round((t_usd / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3) if unit_code == "KWD" else t_usd
+                    l_color = "#00E676" if r[2] == "DOWN" else "#29B6F6"
+                    fig.add_hline(y=y_line, line_dash="dot", line_color=l_color, line_width=1.4, annotation_text=f"🔔 {y_line}", annotation_position="bottom left", annotation_font_color=l_color)
+        fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
