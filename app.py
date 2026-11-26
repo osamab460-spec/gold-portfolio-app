@@ -41,7 +41,7 @@ def get_alerts_sheet():
         return sh.worksheet("التنبيهات")
     except Exception:
         ws = sh.add_worksheet(title="التنبيهات", rows=100, cols=6)
-        ws.append_row(["التاريخ", "السعر المستهدف ($)", "الاتجاه", "الحالة", "الكمية (جم)", "ملاحظة"])
+        ws.append_row(["التاريخ", "السعر ($)", "الاتجاه", "الحالة", "الكمية", "ملاحظة"])
         return ws
 
 sheet_alerts = get_alerts_sheet()
@@ -72,7 +72,9 @@ def live_sabaek_ticker():
         data = services.get_live_gold()
         ounce, chp, buy_24k, sell_24k = data["ounce"], data["chp"], data["buy_24k"], data["sell_24k"]
         k22, k21, k18 = data["k22"], data["k21"], data["k18"]
-        st.session_state["live_ounce"], st.session_state["live_buy_24k"], st.session_state["live_sell_24k"] = ounce, buy_24k, sell_24k
+        st.session_state["live_ounce"] = ounce
+        st.session_state["live_buy_24k"] = buy_24k
+        st.session_state["live_sell_24k"] = sell_24k
         prev_ounce = st.session_state.get("prev_tick_ounce", ounce)
         color_cls, arrow = ("price-up", "▲") if ounce > prev_ounce else (("price-down", "▼") if ounce < prev_ounce else ("price-same", "•"))
         st.session_state["prev_tick_ounce"] = ounce
@@ -124,7 +126,6 @@ if page != "🏠 الرئيسية والشموع":
         .stButton>button { background-color: #E6C25A !important; color: #111111 !important; }
     </style>""", unsafe_allow_html=True)
 
-# ================= الصفحة 1: الرئيسية والشموع (مع خطوط التنبيهات على الشارت) =================
 if page == "🏠 الرئيسية والشموع":
     c1, c2, c3 = st.columns(3)
     tf_label = c1.selectbox("الفاصل", ["1 دقيقة", "10 دقائق", "15 دقيقة", "ساعة", "يومي"])
@@ -135,12 +136,14 @@ if page == "🏠 الرئيسية والشموع":
     show_avg = st.checkbox("إظهار خط متوسط تكلفتي والتنبيهات على الشارت", value=True)
     try:
         df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
-        trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر") if chart_style == "شموع يابانية 🕯️" else go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
+        if chart_style == "شموع يابانية 🕯️":
+            trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر")
+        else:
+            trace = go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
         fig = go.Figure(data=[trace])
         if show_avg:
             if unit_code == "KWD" and curr_avg > 0:
                 fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
-            # رسم خطوط التنبيهات النشطة على الشارت
             for r in sheet_alerts.get_all_values()[1:]:
                 if len(r) >= 4 and str(r[3]).strip().upper() == "ON":
                     try:
@@ -150,4 +153,3 @@ if page == "🏠 الرئيسية والشموع":
                         fig.add_hline(y=y_line, line_dash="dot", line_color=l_color, line_width=1.4, annotation_text=f"🔔 {y_line}", annotation_position="bottom left", annotation_font_color=l_color)
                     except Exception:
                         pass
-
