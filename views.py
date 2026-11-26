@@ -129,17 +129,18 @@ def render_trade_log(sheet_log):
         records = []
         for r in reversed(all_rows[1:]):
             if len(r) >= 4:
+                date_val, op_val, price_val, grams_val = r[:4]
                 try:
-                    p = float(str(r).replace(",", ""))
-                    g = float(str(r).replace(",", ""))
+                    p = float(str(price_val).replace(",", ""))
+                    g = float(str(grams_val).replace(",", ""))
                     tot = round(p * g, 3)
                 except ValueError:
                     tot = 0.0
                 records.append({
-                    "التاريخ": r,
-                    "العملية": f"🟢 {r}" if "شراء" in r else f"🔴 {r}",
-                    "السعر (د.ك)": r,
-                    "الوزن (جم)": r,
+                    "التاريخ": date_val,
+                    "العملية": f"🟢 {op_val}" if "شراء" in op_val else f"🔴 {op_val}",
+                    "السعر (د.ك)": price_val,
+                    "الوزن (جم)": grams_val,
                     "الإجمالي (د.ك)": f"{tot:,.3f}"
                 })
         df_log = pd.DataFrame(records)
