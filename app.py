@@ -10,10 +10,10 @@ st.set_page_config(page_title="دار السبائك AI", page_icon="🪙", layo
 st.markdown("""
 <style>
     .main { direction: rtl; text-align: right; }
-    .sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 14px 4px; border-bottom: 1px solid #2A2A2A; margin-bottom: 14px; }
-    .sabaek-logo { color: #E6C25A; font-size: 1.7rem; font-weight: 900; }
-    .gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; direction: ltr; text-align: left; }
-    .gold-ticker-title { color: #E6C25A; font-weight: 800; font-size: 1.05rem; display: flex; align-items: center; justify-content: space-between; }
+    .sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 12px 4px; border-bottom: 1px solid #2E2E32; margin-bottom: 12px; }
+    .sabaek-logo { color: #E6C25A; font-size: 1.65rem; font-weight: 900; }
+    .gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; direction: ltr; text-align: left; }
+    .gold-ticker-title { color: #E6C25A; font-weight: 800; font-size: 1rem; display: flex; justify-content: space-between; }
     .gold-ticker-price { font-size: 1.45rem; font-weight: 800; margin-top: 6px; }
     .karats-grid { display: grid; grid-template-columns: repeat(4, 1fr); background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 12px 6px; margin-bottom: 14px; text-align: center; direction: rtl; }
     .karat-item { border-left: 1px solid #2E2E32; padding: 0 4px; }
@@ -51,6 +51,7 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
+# ================= شريط الأسعار الحي المتجدد تلقائياً كل 15 ثانية =================
 @st.fragment(run_every=15)
 def live_sabaek_ticker():
     try:
@@ -78,7 +79,7 @@ def live_sabaek_ticker():
         st.markdown(f"""
         <div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#9E9E9E; font-size:0.8rem;">تحديث تلقائي 15ث ⏱️</span></div>
         <div class="gold-ticker-box">
-            <div class="gold-ticker-title"><span>🪙 GOLD SPOT (XAU/USD)</span><span style="font-size:0.75rem; color:#888;">بيع 24: {sell_24k:.3f} د.ك</span></div>
+            <div class="gold-ticker-title"><span>🪙 GOLD SPOT (XAU/USD)</span><span style="color:#E6C25A;">بيع 24: {sell_24k:.3f} د.ك</span></div>
             <div class="gold-ticker-price"><span class="{color_cls}">{ounce:,.3f}</span><span style="font-size:0.9rem; color:#BDBDBD;"> USD </span><span class="{color_cls}" style="font-size:0.95rem;">{arrow} {chp:+.2f}%</span></div>
         </div>
         <div class="karats-grid">
@@ -89,7 +90,7 @@ def live_sabaek_ticker():
         </div>
         """, unsafe_allow_html=True)
     except Exception as e:
-        st.warning(f"جاري مزامنة السعر: {e}")
+        st.error(f"خطأ في جلب السعر: {e}")
 
 live_sabaek_ticker()
 
@@ -97,9 +98,9 @@ ounce = st.session_state.get("live_ounce", 0.0)
 buy_24k = st.session_state.get("live_buy_24k", 0.0)
 sell_24k = st.session_state.get("live_sell_24k", 0.0)
 
+# قراءة بيانات المحفظة
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
-market_val_str = sheet_dashboard.acell("C15").value or "0"
 avg_cost_str = sheet_dashboard.acell("D15").value or "0"
 
 try:
@@ -108,50 +109,56 @@ try:
 except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
+# حساب صافي الربح / الخسارة بالدينار الكويتي بناءً على سعر البيع في دار السبائك
+net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3) if (curr_grams > 0 and sell_24k > 0) else 0.0
+
 page = st.radio("القائمة", ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"], horizontal=True, label_visibility="collapsed")
 st.write("")
 
+# ================= الصفحة 1: الرئيسية + الشارت السريع + ملخص المحفظة والربح =================
 if page == "🏠 الرئيسية والشموع":
-    c_tf, c_unit, c_opt = st.columns(3)
-    tf_label = c_tf.selectbox("الفاصل الزمني", ["15 دقيقة", "10 دقائق", "ساعة", "يومي"])
+    c1, c2, c3 = st.columns(3)
+    tf_label = c1.selectbox("الفاصل", ["15 دقيقة", "10 دقائق", "ساعة", "يومي"])
     tf_map = {"15 دقيقة": "15m", "10 دقائق": "10m", "ساعة": "1h", "يومي": "1d"}
-    unit_label = c_unit.selectbox("العملة", ["دينار كويتي (د.ك)", "دولار أمريكي ($)"])
+    unit_label = c2.selectbox("العملة", ["دينار كويتي (د.ك)", "دولار ($)"])
     unit_code = "KWD" if "كويتي" in unit_label else "USD"
-    show_avg = c_opt.checkbox("خط متوسط تكلفتي", value=True)
-    chart_style = c_opt.selectbox("نوع الرسم", ["شموع يابانية 🕯️", "خطي ذهبي 📈"])
+    chart_style = c3.selectbox("الرسم", ["شموع يابانية 🕯️", "خطي ذهبي 📈"])
+    show_avg = st.checkbox("إظهار خط متوسط تكلفتي على الشارت", value=True)
 
     try:
         df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
         if chart_style == "شموع يابانية 🕯️":
             trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر")
         else:
-            trace = go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), marker=dict(size=5, color="#FFD700"), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
+            trace = go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), marker=dict(size=4, color="#FFD700"), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
 
         fig = go.Figure(data=[trace])
         if show_avg and unit_code == "KWD" and curr_avg > 0:
-            fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسط تكلفتك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
+            fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
 
-        fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=380, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
-        plotly_cfg = {"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "drawrect", "eraseshape"]}
+        fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
+        plotly_cfg = {"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]}
         st.plotly_chart(fig, use_container_width=True, config=plotly_cfg)
-        st.caption("✏️ استخدم شريط الأدوات أعلى الشارت لرسم خطوط الاتجاه والدعم، أو التبديل بين الشموع والرسم الخطي.")
     except Exception as e:
-        st.warning(f"تنبيه الشارت: {e}")
+        st.error(f"تعذر رسم الشارت: {e}")
 
     st.subheader("💼 ملخص محفظتي")
     m1, m2 = st.columns(2)
     m1.metric("رصيد الذهب", f"{gold_balance_str} جم")
     m2.metric("متوسط التكلفة", f"{avg_cost_str} د.ك")
+
     m3, m4 = st.columns(2)
     m3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
-    m4.metric("سعر البيع (دار السبائك)", f"{sell_24k:.3f} د.ك")
+    m4.metric("صافي الربح / الخسارة (بيع)", f"{net_pnl_kwd:+,.3f} د.ك", delta=f"{net_pnl_kwd:+,.3f} د.ك")
 
+# ================= الصفحة 2: مناطق الشراء والمستشار الذكي =================
 elif page == "🎯 مناطق الشراء":
     st.subheader("🎯 اقتراح أفضل أسعار الشراء")
     if st.button("🔍 استخرج أفضل 3 مناطق شراء الآن"):
         st.info("⏳ جاري تحليل الشارت والأخبار...")
         zones = services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams)
         st.success(zones)
+
     st.divider()
     st.subheader("🤖 اسأل المستشار الذكي")
     user_q = st.text_input("مثال: هل الوقت مناسب لشراء 20 جرام أم أنتظر؟")
@@ -161,23 +168,17 @@ elif page == "🎯 مناطق الشراء":
             portfolio_rows = sheet_dashboard.get("A13:I16")
             answer = services.ask_ai_advisor(user_q, ounce, buy_24k, sell_24k, portfolio_rows)
             st.success(answer)
+
     st.divider()
     if st.button("📢 إرسال التقرير الشامل لتيليجرام وواتساب"):
         st.info("⏳ جاري الإرسال...")
         rep = services.generate_and_send_report(sheet_dashboard, send_notifications=True)
         st.markdown(rep, unsafe_allow_html=True)
 
+# ================= الصفحة 3: حاسبة تعديل المتوسط والزكاة =================
 elif page == "🧮 الحاسبة والزكاة":
     st.subheader("🧮 محاكي تعديل المتوسط (ماذا لو اشتريت؟)")
     sim_grams = st.slider("الكمية المقترحة للشراء (بالجرام)", min_value=1, max_value=200, value=20, step=1)
     default_price = float(buy_24k) if buy_24k > 0 else 35.0
     sim_price = st.number_input("سعر الشراء المتوقع للجرام (د.ك)", value=default_price, step=0.1, format="%.3f")
 
-    if curr_grams > 0 and curr_avg > 0:
-        old_total = curr_grams * curr_avg
-        new_total = old_total + (sim_grams * sim_price)
-        new_grams = curr_grams + sim_grams
-        new_avg = round(new_total / new_grams, 3)
-        diff_avg = round(new_avg - curr_avg, 3)
-
-        c1, c2 = st.columns(2)
