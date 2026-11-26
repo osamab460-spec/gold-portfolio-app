@@ -7,7 +7,6 @@ import services
 
 st.set_page_config(page_title="دار السبائك AI", page_icon="🪙", layout="centered", initial_sidebar_state="collapsed")
 
-# التنسيق العام للرئيسية والبطاقات الداكنة (كما هي تماماً)
 st.markdown("""
 <style>
     .main { direction: rtl; text-align: right; }
@@ -24,16 +23,11 @@ st.markdown("""
     .price-up { color: #00E676; }
     .price-down { color: #FF3D00; }
     .price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }
-    
-    /* تلوين بطاقات ملخص المحفظة بالأبيض والذهبي بوضوح تام */
     div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
     div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] { color: #E6C25A !important; font-weight: 700 !important; }
     div[data-testid="stMetricValue"] div, div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 800 !important; }
-
-    /* قائمة الاختيارات الرئيسية */
     div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
     div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; font-weight: 700 !important; }
-
     .stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: 800; }
 </style>
 """, unsafe_allow_html=True)
@@ -60,31 +54,18 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-# ================= شريط الأسعار الحي المتجدد تلقائياً كل 15 ثانية (كما هو) =================
 @st.fragment(run_every=15)
 def live_sabaek_ticker():
     try:
         data = services.get_live_gold()
-        ounce, chp = data["ounce"], data["chp"]
-        buy_24k, sell_24k = data["buy_24k"], data["sell_24k"]
+        ounce, chp, buy_24k, sell_24k = data["ounce"], data["chp"], data["buy_24k"], data["sell_24k"]
         k22, k21, k18 = data["k22"], data["k21"], data["k18"]
-
-        st.session_state["live_ounce"] = ounce
-        st.session_state["live_buy_24k"] = buy_24k
-        st.session_state["live_sell_24k"] = sell_24k
-
+        st.session_state["live_ounce"], st.session_state["live_buy_24k"], st.session_state["live_sell_24k"] = ounce, buy_24k, sell_24k
         prev_ounce = st.session_state.get("prev_tick_ounce", ounce)
-        if ounce > prev_ounce:
-            color_cls, arrow = "price-up", "▲"
-        elif ounce < prev_ounce:
-            color_cls, arrow = "price-down", "▼"
-        else:
-            color_cls, arrow = "price-same", "•"
+        color_cls, arrow = ("price-up", "▲") if ounce > prev_ounce else (("price-down", "▼") if ounce < prev_ounce else ("price-same", "•"))
         st.session_state["prev_tick_ounce"] = ounce
-
         if ounce > 0:
             sheet_dashboard.update_acell("C5", ounce)
-
         st.markdown(f"""
         <div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#9E9E9E; font-size:0.8rem;">تحديث تلقائي 15ث ⏱️</span></div>
         <div class="gold-ticker-box">
@@ -96,76 +77,41 @@ def live_sabaek_ticker():
             <div class="karat-item"><div class="karat-name">عيار ٢٢</div><div class="karat-val {color_cls}">{k22:.3f} د.ك</div></div>
             <div class="karat-item"><div class="karat-name">عيار ٢١</div><div class="karat-val {color_cls}">{k21:.3f} د.ك</div></div>
             <div class="karat-item"><div class="karat-name">عيار ١٨</div><div class="karat-val {color_cls}">{k18:.3f} د.ك</div></div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
     except Exception as e:
-        st.error(f"خطأ في جلب السعر: {e}")
+        st.error(f"خطأ السعر: {e}")
 
 live_sabaek_ticker()
 
 ounce = st.session_state.get("live_ounce", 0.0)
 buy_24k = st.session_state.get("live_buy_24k", 0.0)
 sell_24k = st.session_state.get("live_sell_24k", 0.0)
-
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 avg_cost_str = sheet_dashboard.acell("D15").value or "0"
-
 try:
-    curr_grams = float(gold_balance_str.replace(",", ""))
-    curr_avg = float(avg_cost_str.replace(",", ""))
+    curr_grams, curr_avg = float(gold_balance_str.replace(",", "")), float(avg_cost_str.replace(",", ""))
 except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
 net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3) if (curr_grams > 0 and sell_24k > 0) else 0.0
-
 page = st.radio("القائمة", ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"], horizontal=True, label_visibility="collapsed")
 st.write("")
 
-# ================= تطبيق الخلفية البيضاء والكتابة السوداء على الأقسام الأربعة فقط =================
-if page in ["🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"]:
-    st.markdown("""
-    <style>
-        .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-            background-color: #FFFFFF !important;
-            color: #111111 !important;
-        }
-        h1, h2, h3, h4, p, span, label, div, .stMarkdown {
-            color: #111111 !important;
-        }
-        /* إبقاء النصوص داخل شريط الأسعار وقائمة التنقل العليا بيضاء وواضحة */
+if page != "🏠 الرئيسية والشموع":
+    st.markdown("""<style>
+        .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] { background-color: #FFFFFF !important; color: #111111 !important; }
+        h1, h2, h3, h4, p, span, label, div, .stMarkdown { color: #111111 !important; }
         .gold-ticker-box span, .karats-grid .karat-name { color: #E0E0E0 !important; }
         .gold-ticker-title span:first-child { color: #E6C25A !important; }
         .price-up { color: #00E676 !important; }
         .price-down { color: #FF3D00 !important; }
         div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; }
+        input, textarea, div[data-baseweb="input"] > div { background-color: #F4F5F7 !important; color: #111111 !important; border: 1px solid #CCCCCC !important; }
+        div[data-testid="stAlert"] { background-color: #F8F9FA !important; border: 1px solid #D4AF37 !important; }
+        .stButton>button { background-color: #E6C25A !important; color: #111111 !important; }
+    </style>""", unsafe_allow_html=True)
 
-        /* حقول الإدخال داخل الصفحات البيضاء */
-        input, textarea, div[data-baseweb="input"] > div {
-            background-color: #F4F5F7 !important;
-            color: #111111 !important;
-            border: 1px solid #CCCCCC !important;
-        }
-        div[data-testid="stAlert"] {
-            background-color: #F8F9FA !important;
-            border: 1px solid #D4AF37 !important;
-        }
-        div[data-testid="stAlert"] p {
-            color: #111111 !important;
-        }
-        .stButton>button {
-            background-color: #E6C25A !important;
-            color: #111111 !important;
-            border: 1px solid #C59B27 !important;
-        }
-        .stButton>button p {
-            color: #111111 !important;
-            font-weight: 800 !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-# ================= الصفحة 1: الرئيسية والشموع (كما هي تماماً) =================
 if page == "🏠 الرئيسية والشموع":
     c1, c2, c3 = st.columns(3)
     tf_label = c1.selectbox("الفاصل", ["1 دقيقة", "10 دقائق", "15 دقيقة", "ساعة", "يومي"])
@@ -174,15 +120,32 @@ if page == "🏠 الرئيسية والشموع":
     unit_code = "KWD" if "كويتي" in unit_label else "USD"
     chart_style = c3.selectbox("الرسم", ["شموع يابانية 🕯️", "خطي ذهبي 📈"])
     show_avg = st.checkbox("إظهار خط متوسط تكلفتي على الشارت", value=True)
-
     try:
         df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
-        if chart_style == "شموع يابانية 🕯️":
-            trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر")
-        else:
-            trace = go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), marker=dict(size=4, color="#FFD700"), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
-
+        trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر") if chart_style == "شموع يابانية 🕯️" else go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
         fig = go.Figure(data=[trace])
         if show_avg and unit_code == "KWD" and curr_avg > 0:
             fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
+        fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]})
+    except Exception as e:
+        st.error(f"تعذر رسم الشارت: {e}")
 
+    st.subheader("💼 ملخص محفظتي")
+    m1, m2 = st.columns(2)
+    m1.metric("رصيد الذهب", f"{gold_balance_str} جم")
+    m2.metric("متوسط التكلفة", f"{avg_cost_str} د.ك")
+    m3, m4 = st.columns(2)
+    m3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
+    m4.metric("صافي الربح / الخسارة (بيع)", f"{net_pnl_kwd:+,.3f} د.ك", delta=f"{net_pnl_kwd:+,.3f} د.ك")
+
+elif page == "🎯 مناطق الشراء":
+    st.subheader("🎯 اقتراح أفضل أسعار الشراء")
+    if st.button("🔍 استخرج أفضل 3 مناطق شراء الآن"):
+        st.info("⏳ جاري تحليل الشارت والأخبار...")
+        st.success(services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams))
+    st.divider()
+    st.subheader("🤖 اسأل المستشار الذكي")
+    user_q = st.text_input("مثال: هل الوقت مناسب لشراء 20 جرام أم أنتظر؟")
+    if st.button("احسب وحلّل") and user_q:
+        st.info("⏳ جاري الحساب...")
