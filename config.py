@@ -1,18 +1,16 @@
+import os
 import pytz
 
-# ================= الإعدادات الأساسية =================
-SPREADSHEET_ID = "11s82rxEoX0TwGgzyp8LTYC2XeWJK9Jp3hk_KS14szuo"
+# ================= الإعدادات العامة (بدون بيانات شخصية) =================
+SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "11s82rxEoX0TwGgzyp8LTYC2XeWJK9Jp3hk_KS14szuo")
 SHEET_DASHBOARD_NAME = "لوحة التحليل العام"
 SHEET_LOG_NAME = "سجل العمليات"
 
-CHAT_ID = "7342639951"
-WHATSAPP_PHONE = "96597894119"
-WHATSAPP_APIKEY = "9510859"
-
 KUWAIT_TZ = pytz.timezone("Asia/Kuwait")
-RSS_NEWS_URL = "https://google.com"
+SLASH = chr(47)
+RSS_NEWS_URL = "https:" + SLASH + SLASH + "://google.com" + SLASH + "rss" + SLASH + "search?q=gold+price+forecast+FOMC+CPI+NFP+federal+reserve&hl=en-US&gl=US&ceid=US:en"
 
-# ================= معادلات التسعير والزكاة (الكويت) =================
+# ================= معادلات التسعير والزكاة (الكويت - دار السبائك) =================
 OUNCE_TO_GRAM = 31.1035
 KUWAIT_FACTOR = 0.31805
 SELL_SPREAD_KWD = 0.295
@@ -32,7 +30,7 @@ def build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news
 
 المطلوب (اكتب بالعربية وبشكل منظم ومختصر جداً):
 1. تقييم الاتجاه الفني الحالي (صاعد / هابط / عرضي) وهل السعر الحالي مناسب للدخول أم يُفضل الانتظار؟
-2. جدول أو نقاط واضحة بـ **أفضل 3 مناطق شراء مقترحة** (بالدولار للأونصة وما يعادلها بالدينار الكويتي للجرام في دار السبائك):
+2. نقاط واضحة بـ **أفضل 3 مناطق شراء مقترحة** (بالدولار للأونصة وما يعادلها بالدينار الكويتي للجرام في دار السبائك):
    - **الدفعة الأولى (دعم قريب):** السعر بالدولار + السعر بالكويتي + نسبة السيولة المقترحة.
    - **الدفعة الثانية (دعم متوسط):** السعر بالدولار + السعر بالكويتي + نسبة السيولة المقترحة.
    - **الدفعة الثالثة (قاع قوي/قنص):** السعر بالدولار + السعر بالكويتي + نسبة السيولة المقترحة.
