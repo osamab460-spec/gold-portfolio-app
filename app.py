@@ -55,20 +55,21 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-# ================= 1. الترويسة وأداة TradingView الرسمية المطابقة لدار السبائك =================
+# ================= 1. الترويسة وأداة TradingView الرسمية =================
 st.markdown('<div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#555555; font-size:0.8rem;">TradingView OANDA:XAUUSD</span></div>', unsafe_allow_html=True)
 
-tv_ticker_html = """
+tv_script_src = "https://" + "://tradingview.com" + "/external-embedding/embed-widget-single-quote.js"
+tv_ticker_html = f"""
 <div class="tradingview-widget-container" style="border-radius:14px; overflow:hidden; border:1px solid #2E2E32;">
   <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript" src="https://tradingview.com" async>
-  {
+  <script type="text/javascript" src="{tv_script_src}" async>
+  {{
   "symbol": "OANDA:XAUUSD",
   "width": "100%",
   "isTransparent": false,
   "colorTheme": "dark",
   "locale": "ar_AE"
-  }
+  }}
   </script>
 </div>
 """
@@ -192,5 +193,3 @@ elif page == "🎯 مناطق الشراء":
 
 elif page == "🧮 الحاسبة والزكاة":
     st.subheader("🧮 محاكي تعديل المتوسط (ماذا لو اشتريت؟)")
-    sim_grams = st.slider("الكمية المقترحة للشراء (بالجرام)", min_value=1, max_value=200, value=20, step=1)
-    default_price = float(buy_24k) if buy_24k > 0 else 35.0
