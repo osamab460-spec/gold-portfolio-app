@@ -19,24 +19,46 @@ def init_sheets():
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
 def get_live_gold():
+    # جلب أحدث سعر لحظي بدقة دقيقة واحدة (1m) لضمان التغير التلقائي السريع
     ticker = yf.Ticker("GC=F")
-    hist = ticker.history(period="2d")
-    
-    ounce = round(float(hist["Close"].iloc[-1]), 2)
-    prev_close = round(float(hist["Close"].iloc[-2]), 2) if len(hist) > 1 else ounce
-    ch = round(ounce - prev_close, 2)
+    hist_1m = ticker.history(period="1d", interval="1m")
+    hist_1d = ticker.history(period="2d")
+
+    if not hist_1m.empty:
+        ounce = round(float(hist_1m["Close"].iloc[-1]), 3)
+    else:
+        ounce = round(float(hist_1d["Close"].iloc[-1]), 3)
+
+    prev_close = round(float(hist_1d["Close"].iloc[-2]), 3) if len(hist_1d) > 1 else ounce
+    ch = round(ounce - prev_close, 3)
     chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
 
+    # حساب أسعار العيارات في الكويت (دار السبائك)
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
-    return ounce, ch, chp, buy_24k, sell_24k
+    k22 = round(buy_24k * (22 / 24), 3)
+    k21 = round(buy_24k * (21 / 24), 3)
+    k18 = round(buy_24k * (18 / 24), 3)
 
-def get_candlestick_data(timeframe="1d", unit="KWD"):
+    return {
+        "ounce": ounce,
+        "ch": ch,
+        "chp": chp,
+        "buy_24k": buy_24k,
+        "sell_24k": sell_24k,
+        "k22": k22,
+        "k21": k21,
+        "k18": k18
+    }
+
+def get_candlestick_data(timeframe="15m", unit="KWD"):
     ticker = yf.Ticker("GC=F")
-    if timeframe == "1h":
-        hist = ticker.history(period="7d", interval="1h")
+    if timeframe == "10m":
+        hist = ticker.history(period="1d", interval="5m").tail(40)
     elif timeframe == "15m":
-        hist = ticker.history(period="2d", interval="15m")
+        hist = ticker.history(period="2d", interval="15m").tail(60)
+    elif timeframe == "1h":
+        hist = ticker.history(period="7d", interval="1h")
     else:
         hist = ticker.history(period="2mo", interval="1d")
 
@@ -51,17 +73,14 @@ def get_candlestick_data(timeframe="1d", unit="KWD"):
 def get_chart_and_technicals():
     ticker = yf.Ticker("GC=F")
     hist = ticker.history(period="1mo")
-    
     high_30d = round(float(hist["High"].max()), 2)
     low_30d = round(float(hist["Low"].min()), 2)
     sma_20 = round(float(hist["Close"].tail(20).mean()), 2)
-    
     delta = hist["Close"].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     rsi = round(float(100 - (100 / (1 + rs.iloc[-1]))), 1)
-    
     tech_summary = f"أعلى سعر 30 يوم: {high_30d}$ | أدنى سعر 30 يوم: {low_30d}$ | المتوسط المتحرك 20 يوم: {sma_20}$ | مؤشر القوة النسبية (RSI 14): {rsi}"
     return hist, tech_summary
 
@@ -100,7 +119,8 @@ def suggest_best_buy_zones(ounce, buy_24k, avg_cost, balance):
     return _call_gemini_safe(prompt)
 
 def generate_and_send_report(sheet_dashboard, send_notifications=False):
-    ounce, ch, chp, buy_24k, sell_24k = get_live_gold()
+    data = get_live_gold()
+    ounce, ch, chp, buy_24k = data["ounce"], data["ch"], data["chp"], data["buy_24k"]
     if ounce > 0:
         sheet_dashboard.update_acell("C5", ounce)
 
