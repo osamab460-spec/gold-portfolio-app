@@ -168,7 +168,7 @@ if page == "🏠 الرئيسية والشموع":
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]})
 
     st.subheader("💼 ملخص محفظتي")
-    ```python
+ 
 elif page == "🔔 التنبيهات":
     st.subheader("⚡ إضافة سريعة بالنسب المئوية")
     pct_choice = st.select_slider("اختر نسبة التحرك (%)", options=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0], value=1.5)
