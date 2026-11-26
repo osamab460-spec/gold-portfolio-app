@@ -20,13 +20,18 @@ st.markdown("""
     .karat-name { color: #B0B0B0; font-size: 0.85rem; margin-bottom: 4px; }
     .karat-val { font-size: 1.02rem; font-weight: 800; }
     .price-up { color: #00E676; }
-    div[data-testid="stMetricLabel"], div[data-testid="stMetricLabel"] * { color: #E6C25A !important; font-weight: 800 !important; opacity: 1 !important; }
+    .price-down { color: #FF3D00; }
     .price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }
+
+    /* إجبار عناوين البطاقات وأرقامها على اللون الذهبي والأبيض بوضوح تام */
     div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
-    div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] label, div[data-testid="stMetricLabel"] { color: #E6C25A !important; font-weight: 700 !important; opacity: 1 !important; }
-    div[data-testid="stMetricValue"] div, div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 800 !important; }
+    div[data-testid="stMetricLabel"], div[data-testid="stMetricLabel"] * { color: #E6C25A !important; font-weight: 800 !important; opacity: 1 !important; }
+    div[data-testid="stMetricValue"], div[data-testid="stMetricValue"] * { color: #FFFFFF !important; font-weight: 800 !important; }
+
+    /* تلوين قائمة الاختيارات بالأبيض الناصع على الخلفية السوداء */
     div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
-    div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; font-weight: 700 !important; }
+    div[role="radiogroup"] label, div[role="radiogroup"] label * { color: #FFFFFF !important; font-weight: 700 !important; }
+
     .stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: 800; }
 </style>
 """, unsafe_allow_html=True)
@@ -101,9 +106,8 @@ sell_24k = st.session_state.get("live_sell_24k", 0.0)
 
 def _extract_num(val_str):
     nums = re.findall(r"[-+]?\d*\.\d+|\d+", str(val_str).replace(",", ""))
-def _extract_num(val_str):
-    nums = re.findall(r"[-+]?\d*\.\d+|\d+", str(val_str).replace(",", ""))
     return float(next(iter(nums))) if nums else 0.0
+
 gold_balance_str = sheet_dashboard.acell("A15").value or "0"
 total_cost_str = sheet_dashboard.acell("B15").value or "0"
 avg_cost_str = sheet_dashboard.acell("D15").value or "0"
