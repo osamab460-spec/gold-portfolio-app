@@ -25,7 +25,7 @@ def get_live_gold():
     prev_close = 0.0
     source_label = "SPOT XAU/USD"
 
-    # 1. المصدر المباشر: TradingView Scanner API (يجلب OANDA:XAUUSD الفوري الحقيقي المطابق لدار السبائك)
+    # 1. المصدر المباشر الأول: TradingView Scanner API (OANDA:XAUUSD المطابق لدار السبائك 100%)
     try:
         tv_url = "https://" + "://tradingview.com" + "/cfd/scan"
         payload = {
@@ -37,11 +37,13 @@ def get_live_gold():
         if rows:
             first_row = next(iter(rows))
             vals = first_row.get("d", [])
-            if len(vals) >= 4 and float(vals[0]) > 0:
-                ounce = round(float(vals[0]), 3)
-                ch_abs = float(vals[3])
-                prev_close = round(ounce - ch_abs, 3)
-                source_label = "TV OANDA:XAUUSD"
+            if len(vals) >= 4:
+                first_val = float(next(iter(vals)))
+                if first_val > 0:
+                    ounce = round(first_val, 3)
+                    ch_abs = float(vals[-1])
+                    prev_close = round(ounce - ch_abs, 3)
+                    source_label = "TV OANDA:XAUUSD"
     except Exception:
         pass
 
