@@ -1,4 +1,5 @@
 import json
+import urllib.parse
 import requests
 import feedparser
 from datetime import datetime
@@ -20,13 +21,17 @@ def init_sheets():
 
 @st.cache_data(ttl=15)
 def get_live_gold():
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Referer": "https://" + "goldprice.org/"
+    }
     ounce = 0.0
     prev_close = 0.0
     source_label = "SPOT XAU/USD"
 
+    # 1. المصدر الفوري الأول (GoldPrice API بالمسار الكامل)
     try:
-        gp_url = "https://goldprice.org"
+        gp_url = "https://" + "data-asg.goldprice.org" + "/dbXRates/USD"
         gp_data = requests.get(gp_url, headers=headers, timeout=6).json()
         items = gp_data.get("items", [])
         if items:
@@ -36,9 +41,10 @@ def get_live_gold():
     except Exception:
         pass
 
+    # 2. المصدر الفوري الثاني (Swissquote Spot API بالمسار الكامل)
     if ounce <= 0:
         try:
-            sq_url = "https://swissquote.com"
+            sq_url = "https://" + "://swissquote.com" + "/public-quotes/bboquotes/instrument/XAU/USD"
             sq_data = requests.get(sq_url, headers=headers, timeout=6).json()
             first_sq = next(iter(sq_data))
             prices = first_sq.get("spreadProfilePrices", [])
@@ -47,6 +53,17 @@ def get_live_gold():
         except Exception:
             pass
 
+    # 3. المصدر الفوري الثالث (Gold-API)
+    if ounce <= 0:
+        try:
+            gapi_url = "https://" + "://gold-api.com" + "/price/XAU"
+            r3 = requests.get(gapi_url, timeout=5).json()
+            if float(r3.get("price", 0)) > 0:
+                ounce = round(float(r3["price"]), 3)
+        except Exception:
+            pass
+
+    # 4. الملاذ الأخير (Yahoo Finance)
     if ounce <= 0 or prev_close <= 0:
         ticker = yf.Ticker("GC=F")
         hist_1d = ticker.history(period="2d")
@@ -59,6 +76,7 @@ def get_live_gold():
     ch = round(ounce - prev_close, 3)
     chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
 
+    # حساب أسعار الشراء والبيع المطابقة لدار السبائك
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
     k22 = round(buy_24k * (22 / 24), 3)
@@ -79,6 +97,10 @@ def get_live_gold():
 
 @st.cache_data(ttl=30)
 def get_candlestick_data(timeframe="1m", unit="KWD"):
+    # معايرة الشموع مع السعر الفوري لإزالة فجوة العقود الآجلة
+    spot_data = get_live_gold()
+    spot_ounce = spot_data["ounce"]
+
     ticker = yf.Ticker("GC=F")
     if timeframe == "1m":
         hist = ticker.history(period="1d", interval="1m").tail(60)
@@ -92,6 +114,13 @@ def get_candlestick_data(timeframe="1m", unit="KWD"):
         hist = ticker.history(period="2mo", interval="1d")
 
     df = hist[["Open", "High", "Low", "Close"]].dropna().copy()
+
+    # خصم فارق العقود الآجلة تلقائياً لتتطابق الشموع مع السعر الفوري لدار السبائك
+    if not df.empty and spot_ounce > 0:
+        futures_last = float(df["Close"].iloc[-1])
+        spread_offset = futures_last - spot_ounce
+        df = df - spread_offset
+
     if unit == "KWD":
         df = (df * (config.KUWAIT_FACTOR / config.OUNCE_TO_GRAM)).round(3)
     else:
@@ -135,7 +164,7 @@ def _call_gemini_safe(prompt):
 
 def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
     prompt = f"""أنت حاسبة ذكية ومستشار مالي لمحفظة ذهب (دار السبائك - الكويت). أجب باختصار شديد وبالعربية:
-- سعر الشراء 24: {buy_24k} د.ك | سعر البيع 24: {sell_24k} د.ك | الأونصة: {ounce}$
+- سعر الشراء 24: {buy_24k} د.ك | سعر البيع 24: {sell_24k} د.ك | الأونصة الفورية: {ounce}$
 - بيانات المحفظة: {portfolio_rows}
 - سؤال المستخدم: {user_question}"""
     return _call_gemini_safe(prompt)
@@ -167,12 +196,13 @@ def generate_and_send_report(sheet_dashboard, send_notifications=False):
     report_text = _call_gemini_safe(prompt)
 
     if send_notifications and not report_text.startswith("⚠️"):
-        tg_token = st.secrets.get("TELEGRAM_TOKEN", "")
+        tg_token = st.secrets.get("TELEGRAM_TOKEN", "").strip()
         if tg_token:
-            tg_url = f"https://telegram.org{tg_token}/sendMessage"
+            tg_url = "https://" + "api.telegram.org" + "/bot" + tg_token + "/sendMessage"
             requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": report_text, "parse_mode": "HTML"}, timeout=15)
 
-        wa_url = f"https://callmebot.com{config.WHATSAPP_PHONE}&apikey={config.WHATSAPP_APIKEY}&text={requests.utils.quote(report_text[:900])}"
+        encoded_msg = urllib.parse.quote(report_text[:900])
+        wa_url = "https://" + "://callmebot.com" + "/whatsapp.php?phone=" + str(config.WHATSAPP_PHONE) + "&apikey=" + str(config.WHATSAPP_APIKEY) + "&text=" + encoded_msg
         requests.get(wa_url, timeout=15)
 
     return report_text
