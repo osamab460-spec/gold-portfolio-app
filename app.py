@@ -34,6 +34,18 @@ st.markdown("""
 
 sheet_dashboard, sheet_log = services.init_sheets()
 
+@st.cache_resource
+def get_alerts_sheet():
+    sh = sheet_dashboard.spreadsheet
+    try:
+        return sh.worksheet("التنبيهات")
+    except Exception:
+        ws = sh.add_worksheet(title="التنبيهات", rows=100, cols=6)
+        ws.append_row(["التاريخ", "السعر المستهدف ($)", "الاتجاه", "الحالة", "الكمية (جم)", "ملاحظة"])
+        return ws
+
+sheet_alerts = get_alerts_sheet()
+
 if st.query_params.get("cron") == "run":
     services.generate_and_send_report(sheet_dashboard, send_notifications=True)
     st.success("CRON_OK")
@@ -95,7 +107,7 @@ except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
 net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3) if (curr_grams > 0 and sell_24k > 0) else 0.0
-page = st.radio("القائمة", ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"], horizontal=True, label_visibility="collapsed")
+page = st.radio("القائمة", ["🏠 الرئيسية والشموع", "🔔 التنبيهات", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"], horizontal=True, label_visibility="collapsed")
 st.write("")
 
 if page != "🏠 الرئيسية والشموع":
@@ -107,11 +119,12 @@ if page != "🏠 الرئيسية والشموع":
         .price-up { color: #00E676 !important; }
         .price-down { color: #FF3D00 !important; }
         div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; }
-        input, textarea, div[data-baseweb="input"] > div { background-color: #F4F5F7 !important; color: #111111 !important; border: 1px solid #CCCCCC !important; }
+        input, textarea, div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { background-color: #F4F5F7 !important; color: #111111 !important; border: 1px solid #CCCCCC !important; }
         div[data-testid="stAlert"] { background-color: #F8F9FA !important; border: 1px solid #D4AF37 !important; }
         .stButton>button { background-color: #E6C25A !important; color: #111111 !important; }
     </style>""", unsafe_allow_html=True)
 
+# ================= الصفحة 1: الرئيسية والشموع (مع خطوط التنبيهات على الشارت) =================
 if page == "🏠 الرئيسية والشموع":
     c1, c2, c3 = st.columns(3)
     tf_label = c1.selectbox("الفاصل", ["1 دقيقة", "10 دقائق", "15 دقيقة", "ساعة", "يومي"])
@@ -119,33 +132,22 @@ if page == "🏠 الرئيسية والشموع":
     unit_label = c2.selectbox("العملة", ["دينار كويتي (د.ك)", "دولار ($)"])
     unit_code = "KWD" if "كويتي" in unit_label else "USD"
     chart_style = c3.selectbox("الرسم", ["شموع يابانية 🕯️", "خطي ذهبي 📈"])
-    show_avg = st.checkbox("إظهار خط متوسط تكلفتي على الشارت", value=True)
+    show_avg = st.checkbox("إظهار خط متوسط تكلفتي والتنبيهات على الشارت", value=True)
     try:
         df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
         trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر") if chart_style == "شموع يابانية 🕯️" else go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
         fig = go.Figure(data=[trace])
-        if show_avg and unit_code == "KWD" and curr_avg > 0:
-            fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
-        fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]})
-    except Exception as e:
-        st.error(f"تعذر رسم الشارت: {e}")
+        if show_avg:
+            if unit_code == "KWD" and curr_avg > 0:
+                fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
+            # رسم خطوط التنبيهات النشطة على الشارت
+            for r in sheet_alerts.get_all_values()[1:]:
+                if len(r) >= 4 and str(r[3]).strip().upper() == "ON":
+                    try:
+                        t_usd = float(str(r[1]).replace(",", ""))
+                        y_line = round((t_usd / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3) if unit_code == "KWD" else t_usd
+                        l_color = "#00E676" if r[2] == "DOWN" else "#29B6F6"
+                        fig.add_hline(y=y_line, line_dash="dot", line_color=l_color, line_width=1.4, annotation_text=f"🔔 {y_line}", annotation_position="bottom left", annotation_font_color=l_color)
+                    except Exception:
+                        pass
 
-    st.subheader("💼 ملخص محفظتي")
-    m1, m2 = st.columns(2)
-    m1.metric("رصيد الذهب", f"{gold_balance_str} جم")
-    m2.metric("متوسط التكلفة", f"{avg_cost_str} د.ك")
-    m3, m4 = st.columns(2)
-    m3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
-    m4.metric("صافي الربح / الخسارة (بيع)", f"{net_pnl_kwd:+,.3f} د.ك", delta=f"{net_pnl_kwd:+,.3f} د.ك")
-
-elif page == "🎯 مناطق الشراء":
-    st.subheader("🎯 اقتراح أفضل أسعار الشراء")
-    if st.button("🔍 استخرج أفضل 3 مناطق شراء الآن"):
-        st.info("⏳ جاري تحليل الشارت والأخبار...")
-        st.success(services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams))
-    st.divider()
-    st.subheader("🤖 اسأل المستشار الذكي")
-    user_q = st.text_input("مثال: هل الوقت مناسب لشراء 20 جرام أم أنتظر؟")
-    if st.button("احسب وحلّل") and user_q:
-        st.info("⏳ جاري الحساب...")
