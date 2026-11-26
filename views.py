@@ -16,42 +16,25 @@ def render_home_and_chart(gold_balance_str, total_cost_str, avg_cost_str, curr_a
 
     try:
         df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
-        if not df_candles.empty:
+        if df_candles.empty:
+            st.info("بيانات الشموع غير متاحة حالياً.")
+        else:
             if chart_style == "شموع يابانية 🕯️":
-                trace = go.Candlestick(
-                    x=df_candles.index, open=df_candles["Open"], high=df_candles["High"],
-                    low=df_candles["Low"], close=df_candles["Close"],
-                    increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر"
-                )
+                trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر")
             else:
-                trace = go.Scatter(
-                    x=df_candles.index, y=df_candles["Close"], mode="lines+markers",
-                    line=dict(color="#E6C25A", width=2.5), marker=dict(size=4, color="#FFD700"),
-                    fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر"
-                )
+                trace = go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), marker=dict(size=4, color="#FFD700"), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
 
             fig = go.Figure(data=[trace])
             if show_avg and unit_code == "KWD" and curr_avg > 0:
-                fig.add_hline(
-                    y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8,
-                    annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right",
-                    annotation_font_color="#FFD700"
-                )
+                fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
 
-            fig.update_layout(
-                template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416",
-                height=360, margin=dict(l=8, r=8, t=25, b=8),
-                xaxis_rangeslider_visible=False, dragmode="pan"
-            )
+            fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
             plotly_cfg = {"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]}
             st.plotly_chart(fig, use_container_width=True, config=plotly_cfg)
-        else:
-            st.info("بيانات الشموع غير متاحة حالياً.")
     except Exception as e:
         st.error(f"تعذر رسم الشارت: {e}")
 
     st.subheader("💼 ملخص محفظتي")
-
     avg_display = f"{avg_cost_str} د.ك" if "د.ك" not in str(avg_cost_str) else f"{avg_cost_str}"
     pnl_color = "#00E676" if net_pnl_kwd >= 0 else "#FF3D00"
     pnl_arrow = "▲" if net_pnl_kwd >= 0 else "▼"
@@ -167,3 +150,10 @@ def render_trade_log(sheet_log):
     st.subheader("📜 سجل صفقات محفظتي")
     all_rows = sheet_log.get_all_values()
     if len(all_rows) > 1:
+        records = []
+        for r in reversed(all_rows[1:]):
+            if len(r) >= 4:
+                date_val, op_val, price_val, grams_val = r[:4]
+                try:
+                    p = float(str(price_val).replace(",", ""))
+                    g = float(str(grams_val).replace(",", ""))
