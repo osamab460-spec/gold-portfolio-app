@@ -21,61 +21,50 @@ def init_sheets():
 
 @st.cache_data(ttl=15)
 def get_live_gold():
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": "https://" + "goldprice.org/"
-    }
     ounce = 0.0
     prev_close = 0.0
     source_label = "SPOT XAU/USD"
 
-    # 1. المصدر الفوري الأول: GoldPrice API
+    # 1. المصدر المباشر: TradingView Scanner API (يجلب OANDA:XAUUSD الفوري الحقيقي المطابق لدار السبائك)
     try:
-        gp_url = "https://" + "data-asg.goldprice.org" + "/dbXRates/USD"
-        gp_data = requests.get(gp_url, headers=headers, timeout=6).json()
-        items = gp_data.get("items", [])
-        if items:
-            first_item = next(iter(items))
-            ounce = round(float(first_item.get("xauPrice", 0)), 3)
-            prev_close = round(float(first_item.get("xauClose", ounce)), 3)
+        tv_url = "https://" + "://tradingview.com" + "/cfd/scan"
+        payload = {
+            "symbols": {"tickers": ["OANDA:XAUUSD", "FX_IDC:XAUUSD"]},
+            "columns": ["close", "open", "change", "change_abs"]
+        }
+        tv_res = requests.post(tv_url, json=payload, timeout=6).json()
+        rows = tv_res.get("data", [])
+        if rows:
+            first_row = next(iter(rows))
+            vals = first_row.get("d", [])
+            if len(vals) >= 4 and float(vals[0]) > 0:
+                ounce = round(float(vals[0]), 3)
+                ch_abs = float(vals[3])
+                prev_close = round(ounce - ch_abs, 3)
+                source_label = "TV OANDA:XAUUSD"
     except Exception:
         pass
 
-    # 2. المصدر الفوري الثاني: Swissquote Spot API
+    # 2. المصدر الفوري الاحتياطي الثاني: PAXG-USD (مرتبط 1:1 بالذهب الفوري الحقيقي 24/7)
     if ounce <= 0:
         try:
-            sq_url = "https://" + "://swissquote.com" + "/public-quotes/bboquotes/instrument/XAU/USD"
-            sq_data = requests.get(sq_url, headers=headers, timeout=6).json()
-            first_sq = next(iter(sq_data))
-            prices = first_sq.get("spreadProfilePrices", [])
-            first_price = next(iter(prices))
-            ounce = round((float(first_price.get("bid", 0)) + float(first_price.get("ask", 0))) / 2, 3)
+            paxg = yf.Ticker("PAXG-USD")
+            hist_p = paxg.history(period="2d")
+            if not hist_p.empty:
+                ounce = round(float(hist_p["Close"].iloc[-1]), 3)
+                prev_close = round(float(hist_p["Close"].iloc[-2]), 3) if len(hist_p) > 1 else ounce
+                source_label = "SPOT GOLD (PAXG)"
         except Exception:
             pass
 
-    # 3. المصدر الفوري الثالث: Gold-API
+    # 3. الملاذ الأخير: Yahoo Finance
     if ounce <= 0:
-        try:
-            gapi_url = "https://" + "://gold-api.com" + "/price/XAU"
-            r3 = requests.get(gapi_url, timeout=5).json()
-            if float(r3.get("price", 0)) > 0:
-                ounce = round(float(r3["price"]), 3)
-        except Exception:
-            pass
-
-    # 4. الملاذ الأخير: Yahoo Finance
-    if ounce <= 0 or prev_close <= 0:
-        try:
-            ticker = yf.Ticker("GC=F")
-            hist_1d = ticker.history(period="2d")
-            if not hist_1d.empty:
-                if prev_close <= 0 and len(hist_1d) > 1:
-                    prev_close = round(float(hist_1d["Close"].iloc[-2]), 3)
-                if ounce <= 0:
-                    ounce = round(float(hist_1d["Close"].iloc[-1]), 3)
-                    source_label = "GC=F"
-        except Exception:
-            pass
+        ticker = yf.Ticker("GC=F")
+        hist_1d = ticker.history(period="2d")
+        if not hist_1d.empty:
+            ounce = round(float(hist_1d["Close"].iloc[-1]), 3)
+            prev_close = round(float(hist_1d["Close"].iloc[-2]), 3) if len(hist_1d) > 1 else ounce
+            source_label = "GC=F"
 
     if prev_close <= 0:
         prev_close = ounce
@@ -83,7 +72,7 @@ def get_live_gold():
     ch = round(ounce - prev_close, 3)
     chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
 
-    # محرك تسعير دار السبائك الموحد (0.31699 وفرق بيع 0.295)
+    # حساب أسعار الشراء والبيع المطابقة لدار السبائك
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3) if buy_24k > 0 else 0.0
     k22 = round(buy_24k * (22 / 24), 3)
