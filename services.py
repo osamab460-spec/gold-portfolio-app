@@ -18,8 +18,17 @@ def init_sheets():
     sh = gc.open_by_key(config.SPREADSHEET_ID)
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
+def _get_spot_ticker():
+    # XAUUSD=X هو السعر الفوري للذهب (Spot Gold) المطابق لتسعيرة دار السبائك
+    for sym in ["XAUUSD=X", "PAXG-USD", "GC=F"]:
+        t = yf.Ticker(sym)
+        h = t.history(period="2d")
+        if not h.empty:
+            return t
+    return yf.Ticker("GC=F")
+
 def get_live_gold():
-    ticker = yf.Ticker("GC=F")
+    ticker = _get_spot_ticker()
     hist_1m = ticker.history(period="1d", interval="1m")
     hist_1d = ticker.history(period="2d")
 
@@ -37,7 +46,7 @@ def get_live_gold():
     return {"ounce": ounce, "ch": ch, "chp": chp, "buy_24k": buy_24k, "sell_24k": sell_24k, "k22": k22, "k21": k21, "k18": k18}
 
 def get_candlestick_data(timeframe="15m", unit="KWD"):
-    ticker = yf.Ticker("GC=F")
+    ticker = _get_spot_ticker()
     if timeframe == "10m":
         hist = ticker.history(period="1d", interval="5m").tail(40)
     elif timeframe == "15m":
@@ -55,7 +64,7 @@ def get_candlestick_data(timeframe="15m", unit="KWD"):
     return df
 
 def get_chart_and_technicals():
-    ticker = yf.Ticker("GC=F")
+    ticker = _get_spot_ticker()
     hist = ticker.history(period="1mo")
     high_30d = round(float(hist["High"].max()), 2)
     low_30d = round(float(hist["Low"].min()), 2)
