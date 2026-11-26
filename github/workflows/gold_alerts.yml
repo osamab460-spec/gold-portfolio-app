@@ -2,8 +2,7 @@ name: Semsem Gold Alerts
 
 on:
   schedule:
-    # يعمل تلقائياً كل 5 دقائق على مدار الساعة (24/7)
-    - cron: '*/5 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -25,6 +24,6 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python cron_worker.py
