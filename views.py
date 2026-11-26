@@ -113,7 +113,6 @@ def render_calculator_and_zakat(buy_24k, sell_24k, curr_grams, curr_avg):
     diff_color = "#00E676" if diff_avg <= 0 else "#FF3D00"
     diff_arrow = "▼" if diff_avg < 0 else ("▲" if diff_avg > 0 else "•")
 
-    # بطاقات HTML مخصصة للمحاكي تضمن وضوح العناوين الذهبية
     st.markdown(f"""
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; direction:rtl; margin:8px 0 12px 0;">
         <div style="background:#1C1C1E; border:1px solid #2E2E32; border-right:4px solid #E6C25A; border-radius:12px; padding:12px 14px;">
@@ -166,3 +165,5 @@ def render_add_trade(sheet_log):
 
 def render_trade_log(sheet_log):
     st.subheader("📜 سجل صفقات محفظتي")
+    all_rows = sheet_log.get_all_values()
+    if len(all_rows) > 1:
