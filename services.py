@@ -25,7 +25,7 @@ def get_live_gold():
     prev_close = 0.0
     source_label = "SPOT XAU/USD"
 
-    # 1. المصدر المباشر الأول: TradingView Scanner API (OANDA:XAUUSD المطابق لدار السبائك 100%)
+    # 1. المصدر المباشر الأول: TradingView Scanner API (OANDA:XAUUSD)
     try:
         tv_url = "https://" + "://tradingview.com" + "/cfd/scan"
         payload = {
@@ -47,7 +47,7 @@ def get_live_gold():
     except Exception:
         pass
 
-    # 2. المصدر الفوري الاحتياطي الثاني: PAXG-USD (مرتبط 1:1 بالذهب الفوري الحقيقي 24/7)
+    # 2. المصدر الفوري الاحتياطي الثاني: PAXG-USD (24/7)
     if ounce <= 0:
         try:
             paxg = yf.Ticker("PAXG-USD")
@@ -74,7 +74,6 @@ def get_live_gold():
     ch = round(ounce - prev_close, 3)
     chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
 
-    # حساب أسعار الشراء والبيع المطابقة لدار السبائك
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3) if buy_24k > 0 else 0.0
     k22 = round(buy_24k * (22 / 24), 3)
