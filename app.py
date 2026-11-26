@@ -4,123 +4,32 @@ from datetime import datetime
 import config
 import services
 
-st.set_page_config(
-    page_title="دار السبائك AI",
-    page_icon="🪙",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="دار السبائك AI", page_icon="🪙", layout="centered", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-        background-color: #121212 !important;
-        color: #FFFFFF !important;
-    }
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] { background-color: #121212 !important; color: #FFFFFF !important; }
     .main { direction: rtl; text-align: right; }
     p, span, label, div, h1, h2, h3, h4 { color: #F5F5F5 !important; }
-
-    .sabaek-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 4px 14px 4px;
-        border-bottom: 1px solid #2A2A2A;
-        margin-bottom: 14px;
-    }
-    .sabaek-logo {
-        color: #E6C25A !important;
-        font-size: 1.7rem !important;
-        font-weight: 900 !important;
-        letter-spacing: 0.5px;
-    }
-
-    .gold-ticker-box {
-        background-color: #1C1C1E;
-        border: 1px solid #2E2E32;
-        border-radius: 14px;
-        padding: 14px 16px;
-        margin-bottom: 12px;
-        direction: ltr;
-        text-align: left;
-    }
-    .gold-ticker-title {
-        color: #E6C25A !important;
-        font-weight: 800;
-        font-size: 1.05rem;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .gold-ticker-price {
-        font-size: 1.45rem;
-        font-weight: 800;
-        margin-top: 6px;
-    }
-
-    .karats-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        background-color: #1C1C1E;
-        border: 1px solid #2E2E32;
-        border-radius: 14px;
-        padding: 12px 6px;
-        margin-bottom: 14px;
-        text-align: center;
-        direction: rtl;
-    }
-    .karat-item {
-        border-left: 1px solid #2E2E32;
-        padding: 0 4px;
-    }
+    .sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 14px 4px; border-bottom: 1px solid #2A2A2A; margin-bottom: 14px; }
+    .sabaek-logo { color: #E6C25A !important; font-size: 1.7rem !important; font-weight: 900 !important; }
+    .gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; direction: ltr; text-align: left; }
+    .gold-ticker-title { color: #E6C25A !important; font-weight: 800; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; }
+    .gold-ticker-price { font-size: 1.45rem; font-weight: 800; margin-top: 6px; }
+    .karats-grid { display: grid; grid-template-columns: repeat(4, 1fr); background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 12px 6px; margin-bottom: 14px; text-align: center; direction: rtl; }
+    .karat-item { border-left: 1px solid #2E2E32; padding: 0 4px; }
     .karat-item:last-child { border-left: none; }
-    .karat-name {
-        color: #B0B0B0 !important;
-        font-size: 0.85rem;
-        margin-bottom: 4px;
-    }
-    .karat-val {
-        font-size: 1.02rem;
-        font-weight: 800;
-    }
-
+    .karat-name { color: #B0B0B0 !important; font-size: 0.85rem; margin-bottom: 4px; }
+    .karat-val { font-size: 1.02rem; font-weight: 800; }
     .price-up { color: #00E676 !important; }
     .price-down { color: #FF3D00 !important; }
-    .price-same {
-        color: #111111 !important;
-        background-color: #E0E0E0 !important;
-        padding: 1px 6px;
-        border-radius: 6px;
-    }
-
-    div[data-testid="stMetric"] {
-        background-color: #1C1C1E !important;
-        border: 1px solid #2E2E32 !important;
-        border-right: 4px solid #E6C25A !important;
-        border-radius: 12px;
-        padding: 10px 12px;
-    }
+    .price-same { color: #111111 !important; background-color: #E0E0E0 !important; padding: 1px 6px; border-radius: 6px; }
+    div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
     div[data-testid="stMetricLabel"] p { color: #E6C25A !important; font-size: 0.85rem !important; }
     div[data-testid="stMetricValue"] div { color: #FFFFFF !important; font-size: 1.25rem !important; }
-
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(90deg, #D4AF37 0%, #F3D06B 100%) !important;
-        border: none !important;
-        border-radius: 12px;
-        height: 3.1em;
-    }
+    .stButton>button { width: 100%; background: linear-gradient(90deg, #D4AF37 0%, #F3D06B 100%) !important; border: none !important; border-radius: 12px; height: 3.1em; }
     .stButton>button p { color: #121212 !important; font-weight: 800 !important; font-size: 1rem !important; }
-
-    div[role="radiogroup"] {
-        direction: rtl;
-        justify-content: center;
-        background-color: #1C1C1E !important;
-        padding: 8px;
-        border-radius: 14px;
-        border: 1px solid #333333;
-        gap: 6px;
-    }
+    div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
     div[role="radiogroup"] label p { color: #FFFFFF !important; font-size: 0.9rem !important; font-weight: 700 !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -148,13 +57,11 @@ if not st.session_state.authenticated:
     st.stop()
 
 @st.fragment(run_every=15)
-def live_sabaek_ticker_and_chart():
+def live_sabaek_ticker():
     try:
         data = services.get_live_gold()
-        ounce = data["ounce"]
-        chp = data["chp"]
-        buy_24k = data["buy_24k"]
-        sell_24k = data["sell_24k"]
+        ounce, chp = data["ounce"], data["chp"]
+        buy_24k, sell_24k = data["buy_24k"], data["sell_24k"]
         k22, k21, k18 = data["k22"], data["k21"], data["k18"]
 
         st.session_state["live_ounce"] = ounce
@@ -163,59 +70,33 @@ def live_sabaek_ticker_and_chart():
 
         prev_ounce = st.session_state.get("prev_tick_ounce", ounce)
         if ounce > prev_ounce:
-            color_cls = "price-up"
-            arrow = "▲"
+            color_cls, arrow = "price-up", "▲"
         elif ounce < prev_ounce:
-            color_cls = "price-down"
-            arrow = "▼"
+            color_cls, arrow = "price-down", "▼"
         else:
-            color_cls = "price-same"
-            arrow = "•"
+            color_cls, arrow = "price-same", "•"
         st.session_state["prev_tick_ounce"] = ounce
 
         if ounce > 0:
             sheet_dashboard.update_acell("C5", ounce)
 
         st.markdown(f"""
-        <div class="sabaek-top">
-            <span class="sabaek-logo">🪙 دار السبائك AI</span>
-            <span style="color:#9E9E9E; font-size:0.8rem;">تحديث تلقائي كل 15 ثانية ⏱️</span>
-        </div>
+        <div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#9E9E9E; font-size:0.8rem;">تحديث تلقائي 15ث ⏱️</span></div>
         <div class="gold-ticker-box">
             <div class="gold-ticker-title">🪙 GOLD <span style="font-size:0.75rem; color:#888; margin-left:auto;">TradingView Live</span></div>
-            <div class="gold-ticker-price">
-                <span class="{color_cls}">{ounce:,.3f}</span>
-                <span style="font-size:0.9rem; color:#BDBDBD;"> USD </span>
-                <span class="{color_cls}" style="font-size:0.95rem;">{arrow} {chp:+.2f}%</span>
-            </div>
+            <div class="gold-ticker-price"><span class="{color_cls}">{ounce:,.3f}</span><span style="font-size:0.9rem; color:#BDBDBD;"> USD </span><span class="{color_cls}" style="font-size:0.95rem;">{arrow} {chp:+.2f}%</span></div>
         </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown(f"""
         <div class="karats-grid">
-            <div class="karat-item">
-                <div class="karat-name">عيار ٢٤</div>
-                <div class="karat-val {color_cls}">{buy_24k:.3f} د.ك</div>
-            </div>
-            <div class="karat-item">
-                <div class="karat-name">عيار ٢٢</div>
-                <div class="karat-val {color_cls}">{k22:.3f} د.ك</div>
-            </div>
-            <div class="karat-item">
-                <div class="karat-name">عيار ٢١</div>
-                <div class="karat-val {color_cls}">{k21:.3f} د.ك</div>
-            </div>
-            <div class="karat-item">
-                <div class="karat-name">عيار ١٨</div>
-                <div class="karat-val {color_cls}">{k18:.3f} د.ك</div>
-            </div>
+            <div class="karat-item"><div class="karat-name">عيار ٢٤</div><div class="karat-val {color_cls}">{buy_24k:.3f} د.ك</div></div>
+            <div class="karat-item"><div class="karat-name">عيار ٢٢</div><div class="karat-val {color_cls}">{k22:.3f} د.ك</div></div>
+            <div class="karat-item"><div class="karat-name">عيار ٢١</div><div class="karat-val {color_cls}">{k21:.3f} د.ك</div></div>
+            <div class="karat-item"><div class="karat-name">عيار ١٨</div><div class="karat-val {color_cls}">{k18:.3f} د.ك</div></div>
         </div>
         """, unsafe_allow_html=True)
-
     except Exception as e:
-        st.warning(f"جاري مزامنة السعر اللحظي: {e}")
+        st.warning(f"جاري مزامنة السعر: {e}")
 
-live_sabaek_ticker_and_chart()
+live_sabaek_ticker()
 
 ounce = st.session_state.get("live_ounce", 0.0)
 buy_24k = st.session_state.get("live_buy_24k", 0.0)
@@ -232,13 +113,7 @@ try:
 except ValueError:
     curr_grams, curr_avg = 0.0, 0.0
 
-page = st.radio(
-    "القائمة",
-    ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"],
-    horizontal=True,
-    label_visibility="collapsed"
-)
-
+page = st.radio("القائمة", ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"], horizontal=True, label_visibility="collapsed")
 st.write("")
 
 if page == "🏠 الرئيسية والشموع":
@@ -255,47 +130,43 @@ if page == "🏠 الرئيسية والشموع":
 
     try:
         df_candles = services.get_candlestick_data(timeframe=tf_map[tf_label], unit=unit_code)
-
         if chart_style == "شموع يابانية 🕯️":
-            trace = go.Candlestick(
-                x=df_candles.index,
-                open=df_candles["Open"],
-                high=df_candles["High"],
-                low=df_candles["Low"],
-                close=df_candles["Close"],
-                increasing_line_color="#00E676",
-                decreasing_line_color="#FF3D00",
-                name="السعر"
-            )
+            trace = go.Candlestick(x=df_candles.index, open=df_candles["Open"], high=df_candles["High"], low=df_candles["Low"], close=df_candles["Close"], increasing_line_color="#00E676", decreasing_line_color="#FF3D00", name="السعر")
         else:
-            trace = go.Scatter(
-                x=df_candles.index,
-                y=df_candles["Close"],
-                mode="lines+markers",
-                line=dict(color="#E6C25A", width=2.5),
-                marker=dict(size=5, color="#FFD700"),
-                fill="tozeroy",
-                fillcolor="rgba(230, 194, 90, 0.12)",
-                name="السعر"
-            )
+            trace = go.Scatter(x=df_candles.index, y=df_candles["Close"], mode="lines+markers", line=dict(color="#E6C25A", width=2.5), marker=dict(size=5, color="#FFD700"), fill="tozeroy", fillcolor="rgba(230, 194, 90, 0.12)", name="السعر")
 
         fig = go.Figure(data=[trace])
-
         if show_avg and unit_code == "KWD" and curr_avg > 0:
-            fig.add_hline(
-                y=curr_avg,
-                line_dash="dash",
-                line_color="#FFD700",
-                line_width=1.8,
-                annotation_text=f"متوسط تكلفتك: {curr_avg:.3f} د.ك",
-                annotation_position="top right",
-                annotation_font_color="#FFD700"
-            )
+            fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسط تكلفتك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
 
-        fig.update_layout(
-            template="plotly_dark",
-            paper_bgcolor="#1C1C1E",
-            plot_bgcolor="#141416",
-            height=380,
-            margin=dict(l=8, r=8, t=25, b=8),
-            xaxis_rangeslider_visible=False,
+        fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=380, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
+        plotly_cfg = {"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "drawrect", "eraseshape"]}
+        st.plotly_chart(fig, use_container_width=True, config=plotly_cfg)
+        st.caption("✏️ استخدم شريط الأدوات أعلى الشارت لرسم خطوط الاتجاه والدعم، أو التبديل بين الشموع والرسم الخطي.")
+    except Exception as e:
+        st.info(f"جاري تحميل الشارت: {e}")
+
+    st.subheader("💼 ملخص محفظتي")
+    m1, m2 = st.columns(2)
+    m1.metric("رصيد الذهب", f"{gold_balance_str} جم")
+    m2.metric("متوسط التكلفة", f"{avg_cost_str} د.ك")
+    m3, m4 = st.columns(2)
+    m3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
+    m4.metric("سعر البيع (دار السبائك)", f"{sell_24k:.3f} د.ك")
+
+elif page == "🎯 مناطق الشراء":
+    st.subheader("🎯 اقتراح أفضل أسعار الشراء")
+    if st.button("🔍 استخرج أفضل 3 مناطق شراء الآن"):
+        with st.spinner("جاري تحليل الشارت والأخبار..."):
+            zones = services.suggest_best_buy_zones(ounce, buy_24k, curr_avg, curr_grams)
+            st.success(zones)
+    st.divider()
+    st.subheader("🤖 اسأل المستشار الذكي")
+    user_q = st.text_input("مثال: هل الوقت مناسب لشراء 20 جرام أم أنتظر؟")
+    if st.button("احسب وحلّل"):
+        if user_q:
+            with st.spinner("جاري الحساب..."):
+                portfolio_rows = sheet_dashboard.get("A13:I16")
+                answer = services.ask_ai_advisor(user_q, ounce, buy_24k, sell_24k, portfolio_rows)
+                st.info(answer)
+    st.divider()
