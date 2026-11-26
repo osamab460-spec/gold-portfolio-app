@@ -7,41 +7,34 @@ import services
 
 st.set_page_config(page_title="دار السبائك AI", page_icon="🪙", layout="centered", initial_sidebar_state="collapsed")
 
+# التنسيق العام للرئيسية والبطاقات الداكنة (كما هي تماماً)
 st.markdown("""
 <style>
-    /* تثبيت الخلفية الداكنة في جميع الصفحات */
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] { background-color: #121212 !important; color: #FFFFFF !important; }
     .main { direction: rtl; text-align: right; }
-    h1, h2, h3, h4, p, label, .stMarkdown { color: #F5F5F5 !important; }
-
     .sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 12px 4px; border-bottom: 1px solid #2E2E32; margin-bottom: 12px; }
-    .sabaek-logo { color: #E6C25A !important; font-size: 1.65rem; font-weight: 900; }
+    .sabaek-logo { color: #E6C25A; font-size: 1.65rem; font-weight: 900; }
     .gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; direction: ltr; text-align: left; }
-    .gold-ticker-title { color: #E6C25A !important; font-weight: 800; font-size: 1rem; display: flex; justify-content: space-between; }
+    .gold-ticker-title { color: #E6C25A; font-weight: 800; font-size: 1rem; display: flex; justify-content: space-between; }
     .gold-ticker-price { font-size: 1.45rem; font-weight: 800; margin-top: 6px; }
     .karats-grid { display: grid; grid-template-columns: repeat(4, 1fr); background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 12px 6px; margin-bottom: 14px; text-align: center; direction: rtl; }
     .karat-item { border-left: 1px solid #2E2E32; padding: 0 4px; }
     .karat-item:last-child { border-left: none; }
-    .karat-name { color: #B0B0B0 !important; font-size: 0.85rem; margin-bottom: 4px; }
+    .karat-name { color: #B0B0B0; font-size: 0.85rem; margin-bottom: 4px; }
     .karat-val { font-size: 1.02rem; font-weight: 800; }
-    .price-up { color: #00E676 !important; }
-    .price-down { color: #FF3D00 !important; }
-    .price-same { color: #111111 !important; background-color: #E0E0E0 !important; padding: 1px 6px; border-radius: 6px; }
+    .price-up { color: #00E676; }
+    .price-down { color: #FF3D00; }
+    .price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }
     
     /* تلوين بطاقات ملخص المحفظة بالأبيض والذهبي بوضوح تام */
     div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
     div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] { color: #E6C25A !important; font-weight: 700 !important; }
     div[data-testid="stMetricValue"] div, div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 800 !important; }
 
-    /* تلوين قائمة الاختيارات وحقول الإدخال بالأبيض الناصع على الخلفية السوداء */
+    /* قائمة الاختيارات الرئيسية */
     div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
     div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; font-weight: 700 !important; }
-    div[data-baseweb="select"] > div, input, textarea { background-color: #1C1C1E !important; color: #FFFFFF !important; border-color: #333333 !important; }
-    div[data-baseweb="select"] span { color: #FFFFFF !important; }
-    div[data-testid="stAlert"] { background-color: #1C1C1E !important; border: 1px solid #E6C25A !important; }
 
-    .stButton>button { width: 100%; background: linear-gradient(90deg, #D4AF37 0%, #F3D06B 100%) !important; border: none !important; border-radius: 12px; height: 3.1em; }
-    .stButton>button p { color: #121212 !important; font-weight: 800 !important; font-size: 1rem !important; }
+    .stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: 800; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -129,6 +122,49 @@ net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3) if (curr_grams > 0 an
 page = st.radio("القائمة", ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"], horizontal=True, label_visibility="collapsed")
 st.write("")
 
+# ================= تطبيق الخلفية البيضاء والكتابة السوداء على الأقسام الأربعة فقط =================
+if page in ["🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"]:
+    st.markdown("""
+    <style>
+        .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+            background-color: #FFFFFF !important;
+            color: #111111 !important;
+        }
+        h1, h2, h3, h4, p, span, label, div, .stMarkdown {
+            color: #111111 !important;
+        }
+        /* إبقاء النصوص داخل شريط الأسعار وقائمة التنقل العليا بيضاء وواضحة */
+        .gold-ticker-box span, .karats-grid .karat-name { color: #E0E0E0 !important; }
+        .gold-ticker-title span:first-child { color: #E6C25A !important; }
+        .price-up { color: #00E676 !important; }
+        .price-down { color: #FF3D00 !important; }
+        div[role="radiogroup"] label p, div[role="radiogroup"] label span { color: #FFFFFF !important; }
+
+        /* حقول الإدخال داخل الصفحات البيضاء */
+        input, textarea, div[data-baseweb="input"] > div {
+            background-color: #F4F5F7 !important;
+            color: #111111 !important;
+            border: 1px solid #CCCCCC !important;
+        }
+        div[data-testid="stAlert"] {
+            background-color: #F8F9FA !important;
+            border: 1px solid #D4AF37 !important;
+        }
+        div[data-testid="stAlert"] p {
+            color: #111111 !important;
+        }
+        .stButton>button {
+            background-color: #E6C25A !important;
+            color: #111111 !important;
+            border: 1px solid #C59B27 !important;
+        }
+        .stButton>button p {
+            color: #111111 !important;
+            font-weight: 800 !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
 # ================= الصفحة 1: الرئيسية والشموع (كما هي تماماً) =================
 if page == "🏠 الرئيسية والشموع":
     c1, c2, c3 = st.columns(3)
@@ -149,19 +185,4 @@ if page == "🏠 الرئيسية والشموع":
         fig = go.Figure(data=[trace])
         if show_avg and unit_code == "KWD" and curr_avg > 0:
             fig.add_hline(y=curr_avg, line_dash="dash", line_color="#FFD700", line_width=1.8, annotation_text=f"متوسطك: {curr_avg:.3f}", annotation_position="top right", annotation_font_color="#FFD700")
-
-        fig.update_layout(template="plotly_dark", paper_bgcolor="#1C1C1E", plot_bgcolor="#141416", height=360, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, dragmode="pan")
-        plotly_cfg = {"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToAdd": ["drawline", "drawopenpath", "eraseshape"]}
-        st.plotly_chart(fig, use_container_width=True, config=plotly_cfg)
-    except Exception as e:
-        st.error(f"تعذر رسم الشارت: {e}")
-
-    st.subheader("💼 ملخص محفظتي")
-    m1, m2 = st.columns(2)
-    m1.metric("رصيد الذهب", f"{gold_balance_str} جم")
-    m2.metric("متوسط التكلفة", f"{avg_cost_str} د.ك")
-
-    m3, m4 = st.columns(2)
-    m3.metric("إجمالي التكلفة", f"{total_cost_str} د.ك")
-    m4.metric("صافي الربح / الخسارة (بيع)", f"{net_pnl_kwd:+,.3f} د.ك", delta=f"{net_pnl_kwd:+,.3f} د.ك")
 
