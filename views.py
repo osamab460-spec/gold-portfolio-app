@@ -129,6 +129,7 @@ def render_add_trade(sheet_log):
         final_price = round(price_input / grams, 4) if price_input > 150 else price_input
         today_str = datetime.now(config.KUWAIT_TZ).strftime("%Y-%m-%d")
         sheet_log.append_row([today_str, op_type, final_price, grams], value_input_option="USER_ENTERED")
+        st.cache_data.clear()
         st.success(f"تم تسجيل {op_type} {grams} جم بسعر {final_price} د.ك بنجاح!")
 
 def render_trade_log(sheet_log):
@@ -160,5 +161,6 @@ def render_trade_log(sheet_log):
     st.divider()
     if st.button("🗑️ حذف آخر صفقة مسجلة") and len(all_rows) > 1:
         sheet_log.delete_rows(len(all_rows))
+        st.cache_data.clear()
         st.warning("تم حذف آخر صفقة وتحديث الرصيد!")
         st.rerun()
