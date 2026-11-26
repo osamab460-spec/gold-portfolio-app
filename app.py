@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 import config
@@ -8,33 +9,23 @@ st.set_page_config(page_title="دار السبائك AI", page_icon="🪙", layo
 
 st.markdown("""
 <style>
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] { background-color: #121212 !important; color: #FFFFFF !important; }
     .main { direction: rtl; text-align: right; }
-    p, span, label, div, h1, h2, h3, h4 { color: #F5F5F5 !important; }
-    div[data-testid="stAlert"] { background-color: #1C1C1E !important; border: 1px solid #E6C25A !important; border-radius: 12px; }
-    div[data-baseweb="select"] > div, input, textarea { background-color: #1C1C1E !important; color: #FFFFFF !important; border-color: #333333 !important; }
-    div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"], li[role="option"] { background-color: #1C1C1E !important; color: #FFFFFF !important; }
-    li[role="option"]:hover { background-color: #2E2E32 !important; }
     .sabaek-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 14px 4px; border-bottom: 1px solid #2A2A2A; margin-bottom: 14px; }
-    .sabaek-logo { color: #E6C25A !important; font-size: 1.7rem !important; font-weight: 900 !important; }
+    .sabaek-logo { color: #E6C25A; font-size: 1.7rem; font-weight: 900; }
     .gold-ticker-box { background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; direction: ltr; text-align: left; }
-    .gold-ticker-title { color: #E6C25A !important; font-weight: 800; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; }
+    .gold-ticker-title { color: #E6C25A; font-weight: 800; font-size: 1.05rem; display: flex; align-items: center; justify-content: space-between; }
     .gold-ticker-price { font-size: 1.45rem; font-weight: 800; margin-top: 6px; }
     .karats-grid { display: grid; grid-template-columns: repeat(4, 1fr); background-color: #1C1C1E; border: 1px solid #2E2E32; border-radius: 14px; padding: 12px 6px; margin-bottom: 14px; text-align: center; direction: rtl; }
     .karat-item { border-left: 1px solid #2E2E32; padding: 0 4px; }
     .karat-item:last-child { border-left: none; }
-    .karat-name { color: #B0B0B0 !important; font-size: 0.85rem; margin-bottom: 4px; }
+    .karat-name { color: #B0B0B0; font-size: 0.85rem; margin-bottom: 4px; }
     .karat-val { font-size: 1.02rem; font-weight: 800; }
-    .price-up { color: #00E676 !important; }
-    .price-down { color: #FF3D00 !important; }
-    .price-same { color: #111111 !important; background-color: #E0E0E0 !important; padding: 1px 6px; border-radius: 6px; }
-    div[data-testid="stMetric"] { background-color: #1C1C1E !important; border: 1px solid #2E2E32 !important; border-right: 4px solid #E6C25A !important; border-radius: 12px; padding: 10px 12px; }
-    div[data-testid="stMetricLabel"] p { color: #E6C25A !important; font-size: 0.85rem !important; }
-    div[data-testid="stMetricValue"] div { color: #FFFFFF !important; font-size: 1.25rem !important; }
-    .stButton>button { width: 100%; background: linear-gradient(90deg, #D4AF37 0%, #F3D06B 100%) !important; border: none !important; border-radius: 12px; height: 3.1em; }
-    .stButton>button p { color: #121212 !important; font-weight: 800 !important; font-size: 1rem !important; }
-    div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
-    div[role="radiogroup"] label p { color: #FFFFFF !important; font-size: 0.9rem !important; font-weight: 700 !important; }
+    .price-up { color: #00E676; }
+    .price-down { color: #FF3D00; }
+    .price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }
+    div[data-testid="stMetric"] { background-color: #1C1C1E; border: 1px solid #2E2E32; border-right: 4px solid #E6C25A; border-radius: 12px; padding: 10px 12px; }
+    .stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: 800; }
+    div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -87,11 +78,11 @@ def live_sabaek_ticker():
         st.markdown(f"""
         <div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#9E9E9E; font-size:0.8rem;">تحديث تلقائي 15ث ⏱️</span></div>
         <div class="gold-ticker-box">
-            <div class="gold-ticker-title">🪙 GOLD SPOT <span style="font-size:0.75rem; color:#888; margin-left:auto;">XAU/USD Live</span></div>
+            <div class="gold-ticker-title"><span>🪙 GOLD SPOT (XAU/USD)</span><span style="font-size:0.75rem; color:#888;">بيع 24: {sell_24k:.3f} د.ك</span></div>
             <div class="gold-ticker-price"><span class="{color_cls}">{ounce:,.3f}</span><span style="font-size:0.9rem; color:#BDBDBD;"> USD </span><span class="{color_cls}" style="font-size:0.95rem;">{arrow} {chp:+.2f}%</span></div>
         </div>
         <div class="karats-grid">
-            <div class="karat-item"><div class="karat-name">عيار ٢٤</div><div class="karat-val {color_cls}">{buy_24k:.3f} د.ك</div></div>
+            <div class="karat-item"><div class="karat-name">شراء ٢٤</div><div class="karat-val {color_cls}">{buy_24k:.3f} د.ك</div></div>
             <div class="karat-item"><div class="karat-name">عيار ٢٢</div><div class="karat-val {color_cls}">{k22:.3f} د.ك</div></div>
             <div class="karat-item"><div class="karat-name">عيار ٢١</div><div class="karat-val {color_cls}">{k21:.3f} د.ك</div></div>
             <div class="karat-item"><div class="karat-name">عيار ١٨</div><div class="karat-val {color_cls}">{k18:.3f} د.ك</div></div>
@@ -163,3 +154,30 @@ elif page == "🎯 مناطق الشراء":
         st.success(zones)
     st.divider()
     st.subheader("🤖 اسأل المستشار الذكي")
+    user_q = st.text_input("مثال: هل الوقت مناسب لشراء 20 جرام أم أنتظر؟")
+    if st.button("احسب وحلّل"):
+        if user_q:
+            st.info("⏳ جاري الحساب...")
+            portfolio_rows = sheet_dashboard.get("A13:I16")
+            answer = services.ask_ai_advisor(user_q, ounce, buy_24k, sell_24k, portfolio_rows)
+            st.success(answer)
+    st.divider()
+    if st.button("📢 إرسال التقرير الشامل لتيليجرام وواتساب"):
+        st.info("⏳ جاري الإرسال...")
+        rep = services.generate_and_send_report(sheet_dashboard, send_notifications=True)
+        st.markdown(rep, unsafe_allow_html=True)
+
+elif page == "🧮 الحاسبة والزكاة":
+    st.subheader("🧮 محاكي تعديل المتوسط (ماذا لو اشتريت؟)")
+    sim_grams = st.slider("الكمية المقترحة للشراء (بالجرام)", min_value=1, max_value=200, value=20, step=1)
+    default_price = float(buy_24k) if buy_24k > 0 else 35.0
+    sim_price = st.number_input("سعر الشراء المتوقع للجرام (د.ك)", value=default_price, step=0.1, format="%.3f")
+
+    if curr_grams > 0 and curr_avg > 0:
+        old_total = curr_grams * curr_avg
+        new_total = old_total + (sim_grams * sim_price)
+        new_grams = curr_grams + sim_grams
+        new_avg = round(new_total / new_grams, 3)
+        diff_avg = round(new_avg - curr_avg, 3)
+
+        c1, c2 = st.columns(2)
