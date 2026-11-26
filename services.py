@@ -18,37 +18,58 @@ def init_sheets():
     sh = gc.open_by_key(config.SPREADSHEET_ID)
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
-def _get_spot_ticker():
-    # XAUUSD=X هو السعر الفوري للذهب (Spot Gold) المطابق لتسعيرة دار السبائك
-    for sym in ["XAUUSD=X", "PAXG-USD", "GC=F"]:
-        t = yf.Ticker(sym)
-        h = t.history(period="2d")
-        if not h.empty:
-            return t
-    return yf.Ticker("GC=F")
-
+@st.cache_data(ttl=15)
 def get_live_gold():
-    ticker = _get_spot_ticker()
-    hist_1m = ticker.history(period="1d", interval="1m")
-    hist_1d = ticker.history(period="2d")
+    headers = {"User-Agent": "Mozilla/5.0"}
+    ounce = 0.0
 
-    ounce = round(float(hist_1m["Close"].iloc[-1]), 3) if not hist_1m.empty else round(float(hist_1d["Close"].iloc[-1]), 3)
+    # 1. جلب السعر الفوري الحقيقي (Spot XAU/USD) المطابق لتسعيرة دار السبائك
+    try:
+        url = "https://swissquote.com"
+        data = requests.get(url, headers=headers, timeout=6).json()
+        first_item = next(iter(data))
+        prices = first_item.get("spreadProfilePrices", [])
+        first_price = next(iter(prices))
+        bid = float(first_price.get("bid", 0))
+        ask = float(first_price.get("ask", 0))
+        ounce = round((bid + ask) / 2, 3)
+    except Exception:
+        pass
+
+    # حساب التغير اليومي من إغلاق الأمس
+    ticker = yf.Ticker("GC=F")
+    hist_1d = ticker.history(period="2d")
     prev_close = round(float(hist_1d["Close"].iloc[-2]), 3) if len(hist_1d) > 1 else ounce
+
+    if ounce <= 0:
+        ounce = round(float(hist_1d["Close"].iloc[-1]), 3)
+
     ch = round(ounce - prev_close, 3)
     chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
 
+    # حساب أسعار الشراء والبيع في الكويت (دار السبائك)
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
     k22 = round(buy_24k * (22 / 24), 3)
     k21 = round(buy_24k * (21 / 24), 3)
     k18 = round(buy_24k * (18 / 24), 3)
 
-    return {"ounce": ounce, "ch": ch, "chp": chp, "buy_24k": buy_24k, "sell_24k": sell_24k, "k22": k22, "k21": k21, "k18": k18}
+    return {
+        "ounce": ounce,
+        "ch": ch,
+        "chp": chp,
+        "buy_24k": buy_24k,
+        "sell_24k": sell_24k,
+        "k22": k22,
+        "k21": k21,
+        "k18": k18
+    }
 
+@st.cache_data(ttl=60)
 def get_candlestick_data(timeframe="15m", unit="KWD"):
-    ticker = _get_spot_ticker()
+    ticker = yf.Ticker("GC=F")
     if timeframe == "10m":
-        hist = ticker.history(period="1d", interval="5m").tail(40)
+        hist = ticker.history(period="1d", interval="5m").tail(48)
     elif timeframe == "15m":
         hist = ticker.history(period="2d", interval="15m").tail(60)
     elif timeframe == "1h":
@@ -56,15 +77,16 @@ def get_candlestick_data(timeframe="15m", unit="KWD"):
     else:
         hist = ticker.history(period="2mo", interval="1d")
 
-    df = hist[["Open", "High", "Low", "Close"]].copy()
+    df = hist[["Open", "High", "Low", "Close"]].dropna().copy()
     if unit == "KWD":
         df = (df * (config.KUWAIT_FACTOR / config.OUNCE_TO_GRAM)).round(3)
     else:
         df = df.round(2)
     return df
 
+@st.cache_data(ttl=300)
 def get_chart_and_technicals():
-    ticker = _get_spot_ticker()
+    ticker = yf.Ticker("GC=F")
     hist = ticker.history(period="1mo")
     high_30d = round(float(hist["High"].max()), 2)
     low_30d = round(float(hist["Low"].min()), 2)
