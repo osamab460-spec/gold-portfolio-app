@@ -29,7 +29,7 @@ def get_live_gold():
     prev_close = 0.0
     source_label = "SPOT XAU/USD"
 
-    # 1. المصدر الفوري الأول (GoldPrice API بالمسار الكامل)
+    # 1. المصدر الفوري الأول: GoldPrice API
     try:
         gp_url = "https://" + "data-asg.goldprice.org" + "/dbXRates/USD"
         gp_data = requests.get(gp_url, headers=headers, timeout=6).json()
@@ -41,7 +41,7 @@ def get_live_gold():
     except Exception:
         pass
 
-    # 2. المصدر الفوري الثاني (Swissquote Spot API بالمسار الكامل)
+    # 2. المصدر الفوري الثاني: Swissquote Spot API
     if ounce <= 0:
         try:
             sq_url = "https://" + "://swissquote.com" + "/public-quotes/bboquotes/instrument/XAU/USD"
@@ -53,7 +53,7 @@ def get_live_gold():
         except Exception:
             pass
 
-    # 3. المصدر الفوري الثالث (Gold-API)
+    # 3. المصدر الفوري الثالث: Gold-API
     if ounce <= 0:
         try:
             gapi_url = "https://" + "://gold-api.com" + "/price/XAU"
@@ -63,22 +63,29 @@ def get_live_gold():
         except Exception:
             pass
 
-    # 4. الملاذ الأخير (Yahoo Finance)
+    # 4. الملاذ الأخير: Yahoo Finance
     if ounce <= 0 or prev_close <= 0:
-        ticker = yf.Ticker("GC=F")
-        hist_1d = ticker.history(period="2d")
-        if prev_close <= 0 and len(hist_1d) > 1:
-            prev_close = round(float(hist_1d["Close"].iloc[-2]), 3)
-        if ounce <= 0:
-            ounce = round(float(hist_1d["Close"].iloc[-1]), 3)
-            source_label = "GC=F"
+        try:
+            ticker = yf.Ticker("GC=F")
+            hist_1d = ticker.history(period="2d")
+            if not hist_1d.empty:
+                if prev_close <= 0 and len(hist_1d) > 1:
+                    prev_close = round(float(hist_1d["Close"].iloc[-2]), 3)
+                if ounce <= 0:
+                    ounce = round(float(hist_1d["Close"].iloc[-1]), 3)
+                    source_label = "GC=F"
+        except Exception:
+            pass
+
+    if prev_close <= 0:
+        prev_close = ounce
 
     ch = round(ounce - prev_close, 3)
     chp = round((ch / prev_close) * 100, 2) if prev_close else 0.0
 
-    # حساب أسعار الشراء والبيع المطابقة لدار السبائك
+    # محرك تسعير دار السبائك الموحد
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
-    sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
+    sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3) if buy_24k > 0 else 0.0
     k22 = round(buy_24k * (22 / 24), 3)
     k21 = round(buy_24k * (21 / 24), 3)
     k18 = round(buy_24k * (18 / 24), 3)
@@ -97,7 +104,6 @@ def get_live_gold():
 
 @st.cache_data(ttl=30)
 def get_candlestick_data(timeframe="1m", unit="KWD"):
-    # معايرة الشموع مع السعر الفوري لإزالة فجوة العقود الآجلة
     spot_data = get_live_gold()
     spot_ounce = spot_data["ounce"]
 
@@ -105,7 +111,17 @@ def get_candlestick_data(timeframe="1m", unit="KWD"):
     if timeframe == "1m":
         hist = ticker.history(period="1d", interval="1m").tail(60)
     elif timeframe == "10m":
-        hist = ticker.history(period="1d", interval="5m").tail(48)
+        # جلب 5 دقائق وتجميعها بدقة إلى شموع 10 دقائق (Resample 10min)
+        raw_5m = ticker.history(period="2d", interval="5m")
+        if not raw_5m.empty:
+            hist = raw_5m.resample("10min").agg({
+                "Open": "first",
+                "High": "max",
+                "Low": "min",
+                "Close": "last"
+            }).dropna().tail(48)
+        else:
+            hist = raw_5m
     elif timeframe == "15m":
         hist = ticker.history(period="2d", interval="15m").tail(60)
     elif timeframe == "1h":
@@ -113,9 +129,12 @@ def get_candlestick_data(timeframe="1m", unit="KWD"):
     else:
         hist = ticker.history(period="2mo", interval="1d")
 
+    if hist.empty:
+        return pd.DataFrame(columns=["Open", "High", "Low", "Close"])
+
     df = hist[["Open", "High", "Low", "Close"]].dropna().copy()
 
-    # خصم فارق العقود الآجلة تلقائياً لتتطابق الشموع مع السعر الفوري لدار السبائك
+    # معايرة الشموع مع السعر الفوري لإزالة فجوة العقود الآجلة
     if not df.empty and spot_ounce > 0:
         futures_last = float(df["Close"].iloc[-1])
         spread_offset = futures_last - spot_ounce
@@ -131,14 +150,25 @@ def get_candlestick_data(timeframe="1m", unit="KWD"):
 def get_chart_and_technicals():
     ticker = yf.Ticker("GC=F")
     hist = ticker.history(period="1mo")
+    if hist.empty:
+        return hist, "لا تتوفر بيانات تاريخية كافية حالياً."
+
     high_30d = round(float(hist["High"].max()), 2)
     low_30d = round(float(hist["Low"].min()), 2)
     sma_20 = round(float(hist["Close"].tail(20).mean()), 2)
+
     delta = hist["Close"].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
-    rsi = round(float(100 - (100 / (1 + rs.iloc[-1]))), 1)
+    last_loss = float(loss.iloc[-1]) if not pd.isna(loss.iloc[-1]) else 0.0
+    last_gain = float(gain.iloc[-1]) if not pd.isna(gain.iloc[-1]) else 0.0
+
+    if last_loss == 0:
+        rsi = 100.0 if last_gain > 0 else 50.0
+    else:
+        rs = last_gain / last_loss
+        rsi = round(100 - (100 / (1 + rs)), 1)
+
     tech_summary = f"أعلى سعر 30 يوم: {high_30d}$ | أدنى سعر 30 يوم: {low_30d}$ | المتوسط المتحرك 20 يوم: {sma_20}$ | مؤشر القوة النسبية (RSI 14): {rsi}"
     return hist, tech_summary
 
