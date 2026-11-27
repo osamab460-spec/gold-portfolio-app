@@ -13,6 +13,7 @@ import config
 
 ai_client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"].strip())
 
+# ================== Google Sheets ==================
 @st.cache_resource
 def init_sheets():
     creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
@@ -20,37 +21,38 @@ def init_sheets():
     sh = gc.open_by_key(config.SPREADSHEET_ID)
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
+# ================== السعر الحي ==================
 @st.cache_data(ttl=15)
 def get_live_gold():
     ounce = 0.0
     prev_close = 0.0
     source_label = "SPOT XAU/USD"
 
+    # 1) TradingView Scanner API (رابط صحيح)
     try:
-        tv_url = "".join(["https://", "scanner.", "://tradingview.com"])
+        tv_url = "https://scanner.tradingview.com/symbol"
         payload = {
             "symbols": {"tickers": ["OANDA:XAUUSD", "FX_IDC:XAUUSD"]},
-            "columns": ["close", "open", "change", "change_abs"]
+            "columns": ["close", "open", "change", "change_abs"],
         }
-        tv_res = requests.post(tv_url, json=payload, timeout=5).json()
+        headers = {"User-Agent": config.RSS_HEADERS["User-Agent"], "Content-Type": "application/json"}
+        tv_res = requests.post(tv_url, json=payload, headers=headers, timeout=6).json()
         rows = tv_res.get("data", [])
         if rows:
-            first_row = next(iter(rows))
-            vals = first_row.get("d", [])
-            if len(vals) >= 4:
-                first_val = float(next(iter(vals)))
-                if first_val > 0:
-                    ounce = round(first_val, 3)
-                    ch_abs = float(vals[-1])
-                    prev_close = round(ounce - ch_abs, 3)
-                    source_label = "TV OANDA:XAUUSD"
+            first_row = rows[0] if isinstance(rows, list) else next(iter(rows))
+            vals = first_row.get("d", []) if isinstance(first_row, dict) else []
+            if len(vals) >= 4 and vals[0] is not None and float(vals[0]) > 0:
+                ounce = round(float(vals[0]), 3)
+                ch_abs = float(vals[3]) if vals[3] is not None else 0.0
+                prev_close = round(ounce - ch_abs, 3)
+                source_label = "TV OANDA:XAUUSD"
     except Exception:
         pass
 
+    # 2) PAXG كبديل
     if ounce <= 0:
         try:
-            paxg = yf.Ticker("PAXG-USD")
-            hist_p = paxg.history(period="2d")
+            hist_p = yf.Ticker("PAXG-USD").history(period="2d")
             if not hist_p.empty:
                 ounce = round(float(hist_p["Close"].iloc[-1]), 3)
                 prev_close = round(float(hist_p["Close"].iloc[-2]), 3) if len(hist_p) > 1 else ounce
@@ -58,13 +60,16 @@ def get_live_gold():
         except Exception:
             pass
 
+    # 3) GC=F كبديل أخير
     if ounce <= 0:
-        ticker = yf.Ticker("GC=F")
-        hist_1d = ticker.history(period="2d")
-        if not hist_1d.empty:
-            ounce = round(float(hist_1d["Close"].iloc[-1]), 3)
-            prev_close = round(float(hist_1d["Close"].iloc[-2]), 3) if len(hist_1d) > 1 else ounce
-            source_label = "GC=F"
+        try:
+            hist_1d = yf.Ticker("GC=F").history(period="2d")
+            if not hist_1d.empty:
+                ounce = round(float(hist_1d["Close"].iloc[-1]), 3)
+                prev_close = round(float(hist_1d["Close"].iloc[-2]), 3) if len(hist_1d) > 1 else ounce
+                source_label = "GC=F"
+        except Exception:
+            pass
 
     if prev_close <= 0:
         prev_close = ounce
@@ -74,9 +79,6 @@ def get_live_gold():
 
     buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
     sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3) if buy_24k > 0 else 0.0
-    k22 = round(buy_24k * (22 / 24), 3)
-    k21 = round(buy_24k * (21 / 24), 3)
-    k18 = round(buy_24k * (18 / 24), 3)
 
     return {
         "ounce": ounce,
@@ -84,12 +86,13 @@ def get_live_gold():
         "chp": chp,
         "buy_24k": buy_24k,
         "sell_24k": sell_24k,
-        "k22": k22,
-        "k21": k21,
-        "k18": k18,
-        "source": source_label
+        "k22": round(buy_24k * (22 / 24), 3),
+        "k21": round(buy_24k * (21 / 24), 3),
+        "k18": round(buy_24k * (18 / 24), 3),
+        "source": source_label,
     }
 
+# ================== الشموع ==================
 @st.cache_data(ttl=30)
 def get_candlestick_data(timeframe="1m", unit="KWD"):
     spot_data = get_live_gold()
@@ -102,10 +105,7 @@ def get_candlestick_data(timeframe="1m", unit="KWD"):
         raw_5m = ticker.history(period="2d", interval="5m")
         if not raw_5m.empty:
             hist = raw_5m.resample("10min").agg({
-                "Open": "first",
-                "High": "max",
-                "Low": "min",
-                "Close": "last"
+                "Open": "first", "High": "max", "Low": "min", "Close": "last"
             }).dropna().tail(48)
         else:
             hist = raw_5m
@@ -116,26 +116,29 @@ def get_candlestick_data(timeframe="1m", unit="KWD"):
     else:
         hist = ticker.history(period="2mo", interval="1d")
 
-    if hist.empty:
+    if hist is None or hist.empty:
         return pd.DataFrame(columns=["Open", "High", "Low", "Close"])
 
     df = hist[["Open", "High", "Low", "Close"]].dropna().copy()
 
+    # إزاحة الفيوتشرز إلى السبوت فقط إذا كانت قريبة (أقل من 3%)
     if not df.empty and spot_ounce > 0:
         futures_last = float(df["Close"].iloc[-1])
         spread_offset = futures_last - spot_ounce
-        df = df - spread_offset
+        if abs(spread_offset) <= spot_ounce * 0.03:
+            df = df - spread_offset
 
     if unit == "KWD":
         df = (df * (config.KUWAIT_FACTOR / config.OUNCE_TO_GRAM)).round(3)
     else:
         df = df.round(2)
     return df
+
+# ================== التحليل الفني ==================
 @st.cache_data(ttl=300)
 def get_chart_and_technicals():
-    ticker = yf.Ticker("GC=F")
-    hist = ticker.history(period="1mo")
-    if hist.empty:
+    hist = yf.Ticker("GC=F").history(period="1mo")
+    if hist is None or hist.empty:
         return hist, "لا تتوفر بيانات تاريخية كافية حالياً."
 
     high_30d = round(float(hist["High"].max()), 2)
@@ -151,24 +154,35 @@ def get_chart_and_technicals():
     if last_loss == 0:
         rsi = 100.0 if last_gain > 0 else 50.0
     else:
-        rs = last_gain / last_loss
-        rsi = round(100 - (100 / (1 + rs)), 1)
+        rsi = round(100 - (100 / (1 + last_gain / last_loss)), 1)
 
-    tech_summary = f"أعلى سعر 30 يوم: {high_30d}$ | أدنى سعر 30 يوم: {low_30d}$ | المتوسط المتحرك 20 يوم: {sma_20}$ | مؤشر القوة النسبية (RSI 14): {rsi}"
+    tech_summary = (
+        f"أعلى سعر 30 يوم: {high_30d}$ | أدنى سعر 30 يوم: {low_30d}$ | "
+        f"المتوسط المتحرك 20 يوم: {sma_20}$ | مؤشر القوة النسبية (RSI 14): {rsi}"
+    )
     return hist, tech_summary
 
+# ================== الأخبار ==================
 @st.cache_data(ttl=600)
 def _get_cached_news():
-    try:
-        res = requests.get(config.RSS_NEWS_URL, timeout=4)
-        feed = feedparser.parse(res.content)
-        return "\n".join([entry.title for entry in feed.entries[:6]])
-    except Exception:
-        return "لا توجد أخبار عاجلة حالياً."
+    titles = []
+    for url in config.RSS_NEWS_URLS:
+        try:
+            res = requests.get(url, timeout=5, headers=config.RSS_HEADERS)
+            if res.status_code != 200:
+                continue
+            feed = feedparser.parse(res.content)
+            titles.extend([entry.title for entry in feed.entries[:4]])
+            if len(titles) >= 6:
+                break
+        except Exception:
+            continue
+    return "\n".join(titles[:6]) if titles else "لا توجد أخبار عاجلة حالياً."
 
+# ================== Gemini ==================
 @st.cache_data(ttl=3600)
 def _get_available_flash_models():
-    models = ["gemini-3.8-flash", "gemini-3-flash-preview"]
+    models = list(config.GEMINI_MODELS)
     try:
         for m in ai_client.models.list():
             name = m.name.replace("models/", "")
@@ -183,11 +197,13 @@ def _call_gemini_safe(prompt):
     for model_name in _get_available_flash_models():
         try:
             res = ai_client.models.generate_content(model=model_name, contents=prompt)
-            return res.text
+            txt = getattr(res, "text", None)
+            if txt:
+                return txt
         except Exception as e:
             last_error = str(e)
             continue
-    return f"⚠️ تعذر الاتصال بالذكاء الاصطناعي. السبب: {last_error}"
+    return f"⚠️ تعذر الاتصال بالذكاء الاصطناعي. السبب: {last_error or 'غير معروف'}"
 
 def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
     prompt = (
@@ -204,48 +220,64 @@ def suggest_best_buy_zones(ounce, buy_24k, avg_cost, balance):
     prompt = config.build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text)
     return _call_gemini_safe(prompt)
 
+# ================== التقارير ==================
+def _clean_telegram_token(raw):
+    raw = (raw or "").strip().strip('"').strip("'")
+    if "bot" in raw and "/" in raw:
+        return next(iter(raw.split("bot")[-1].split("/")))
+    return raw
+
 def generate_and_send_report(sheet_dashboard, send_notifications=False):
     data = get_live_gold()
     ounce, ch, chp, buy_24k = data["ounce"], data["ch"], data["chp"], data["buy_24k"]
     if ounce > 0:
         sheet_dashboard.update_acell("C5", ounce)
 
-    portfolio_rows = sheet_dashboard.get("A5:I18")
-    portfolio_text = "\n".join([" | ".join(r) for r in portfolio_rows if r])
-    targets_rows = sheet_dashboard.get("A19:B21")
-    targets_text = "\n".join([" | ".join(r) for r in targets_rows if r])
-
+    portfolio_text = "\n".join([" | ".join(r) for r in sheet_dashboard.get("A5:I18") if r])
+    targets_text = "\n".join([" | ".join(r) for r in sheet_dashboard.get("A19:B21") if r])
     news_text = _get_cached_news()
 
     now_kw = datetime.now(config.KUWAIT_TZ).strftime("%A, %Y-%m-%d %H:%M")
     prompt = config.build_report_prompt(now_kw, ounce, ch, chp, buy_24k, portfolio_text, targets_text, news_text)
-
     report_text = _call_gemini_safe(prompt)
+
     status_notes = []
-
     if send_notifications and not report_text.startswith("⚠️"):
-        raw_tg = st.secrets.get("TELEGRAM_TOKEN", "").strip().strip('"').strip("'")
-        tg_token = next(iter(raw_tg.split("bot")[-1].split("/"))) if ("bot" in raw_tg and "/" in raw_tg) else raw_tg
-
+        # ---------- Telegram ----------
+        tg_token = _clean_telegram_token(st.secrets.get("TELEGRAM_TOKEN", ""))
         if not tg_token:
-            status_notes.append("❌ تيليجرام: مفتاح TELEGRAM_TOKEN غير موجود في Secrets.")
+            status_notes.append("❌ تيليجرام: مفتاح TELEGRAM_TOKEN غير موجود.")
         else:
-            tg_url = "".join(["https://", "api.", "telegram.org/bot", tg_token, "/sendMessage"])
-
-            res = requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": report_text[:4000], "parse_mode": "HTML"}, timeout=15)
-            if res.status_code == 200:
-                status_notes.append("✅ تيليجرام: تم الإرسال بنجاح.")
-            else:
-                clean_text = re.sub(r"<[^>]+>", "", report_text)[:4000]
-                res_plain = requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": clean_text}, timeout=15)
-                if res_plain.status_code == 200:
-                    status_notes.append("✅ تيليجرام: تم الإرسال بنجاح (نص عادي).")
+            tg_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+            try:
+                res = requests.post(
+                    tg_url,
+                    json={"chat_id": config.CHAT_ID, "text": report_text[:4000], "parse_mode": "HTML"},
+                    timeout=15,
+                )
+                if res.status_code == 200:
+                    status_notes.append("✅ تيليجرام: تم الإرسال.")
                 else:
-                    status_notes.append(f"❌ تيليجرام فشل ({res_plain.status_code}): {res_plain.text}")
+                    clean_text = re.sub(r"<[^>]+>", "", report_text)[:4000]
+                    res2 = requests.post(
+                        tg_url,
+                        json={"chat_id": config.CHAT_ID, "text": clean_text},
+                        timeout=15,
+                    )
+                    if res2.status_code == 200:
+                        status_notes.append("✅ تيليجرام: تم الإرسال (نص عادي).")
+                    else:
+                        status_notes.append(f"❌ تيليجرام فشل ({res2.status_code}): {res2.text[:120]}")
+            except Exception as e:
+                status_notes.append(f"❌ تيليجرام: {e}")
 
+        # ---------- WhatsApp (CallMeBot) ----------
         try:
             encoded_msg = urllib.parse.quote(re.sub(r"<[^>]+>", "", report_text)[:900])
-            wa_url = "".join(["https://", "api.", "://callmebot.com", str(config.WHATSAPP_PHONE), "&apikey=", str(config.WHATSAPP_APIKEY), "&text=", encoded_msg])
+            wa_url = (
+                f"https://api.callmebot.com/whatsapp.php"
+                f"?phone={config.WHATSAPP_PHONE}&apikey={config.WHATSAPP_APIKEY}&text={encoded_msg}"
+            )
             wa_res = requests.get(wa_url, timeout=15)
             status_notes.append("✅ واتساب: تم الإرسال." if wa_res.status_code == 200 else f"⚠️ واتساب: كود {wa_res.status_code}")
         except Exception as e:
