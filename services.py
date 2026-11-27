@@ -99,39 +99,44 @@ def get_candlestick_data(timeframe="1m", unit="KWD"):
     spot_ounce = spot_data["ounce"]
 
     ticker = yf.Ticker("GC=F")
-    if timeframe == "1m":
-        hist = ticker.history(period="1d", interval="1m").tail(60)
-    elif timeframe == "10m":
-        raw_5m = ticker.history(period="2d", interval="5m")
-        if not raw_5m.empty:
-            hist = raw_5m.resample("10min").agg({
-                "Open": "first", "High": "max", "Low": "min", "Close": "last"
-            }).dropna().tail(48)
+    try:
+        if timeframe == "1m":
+            hist = ticker.history(period="1d", interval="1m").tail(60)
+        elif timeframe == "10m":
+            raw_5m = ticker.history(period="2d", interval="5m")
+            if not raw_5m.empty:
+                hist = raw_5m.resample("10min").agg({
+                    "Open": "first", "High": "max", "Low": "min", "Close": "last"
+                }).dropna().tail(48)
+            else:
+                hist = raw_5m
+        elif timeframe == "15m":
+            hist = ticker.history(period="2d", interval="15m").tail(60)
+        elif timeframe == "1h":
+            hist = ticker.history(period="7d", interval="1h")
         else:
-            hist = raw_5m
-    elif timeframe == "15m":
-        hist = ticker.history(period="2d", interval="15m").tail(60)
-    elif timeframe == "1h":
-        hist = ticker.history(period="7d", interval="1h")
-    else:
-        hist = ticker.history(period="2mo", interval="1d")
+            hist = ticker.history(period="2mo", interval="1d")
+    except Exception as e:
+        print(f"YF Error: {e}")
+        return pd.DataFrame(columns=["Open", "High", "Low", "Close"])
 
     if hist is None or hist.empty:
         return pd.DataFrame(columns=["Open", "High", "Low", "Close"])
 
     df = hist[["Open", "High", "Low", "Close"]].dropna().copy()
 
-    # إزاحة الفيوتشرز إلى السبوت فقط إذا كانت قريبة (أقل من 3%)
+    # إزاحة الفيوتشرز إلى السبوت بحذر شديد (لتجنب تفريغ الشارت)
     if not df.empty and spot_ounce > 0:
         futures_last = float(df["Close"].iloc[-1])
         spread_offset = futures_last - spot_ounce
-        if abs(spread_offset) <= spot_ounce * 0.03:
+        if abs(spread_offset) < 50: # نطبقها فقط إذا كان الفرق منطقياً
             df = df - spread_offset
 
     if unit == "KWD":
         df = (df * (config.KUWAIT_FACTOR / config.OUNCE_TO_GRAM)).round(3)
     else:
         df = df.round(2)
+        
     return df
 
 # ================== التحليل الفني ==================
