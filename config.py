@@ -8,16 +8,20 @@ def _get_secret(key, default=""):
     except Exception:
         return str(os.environ.get(key, default)).strip()
 
+# ================= إعدادات Google Sheets =================
 SPREADSHEET_ID = "11s82rxEoX0TwGgzyp8LTYC2XeWJK9Jp3hk_KS14szuo"
 SHEET_DASHBOARD_NAME = "لوحة التحليل العام"
 SHEET_LOG_NAME = "سجل العمليات"
 
+# ================= إعدادات التنبيهات =================
 CHAT_ID = _get_secret("CHAT_ID", "7342639951")
 WHATSAPP_PHONE = _get_secret("WHATSAPP_PHONE", "96597894119")
 WHATSAPP_APIKEY = _get_secret("WHATSAPP_APIKEY", "9510859")
 
 KUWAIT_TZ = pytz.timezone("Asia/Kuwait")
 RSS_NEWS_URL = "https://google.com"
+
+# ================= معادلات التسعير (دار السبائك - الكويت) =================
 OUNCE_TO_GRAM = 31.1035
 KUWAIT_FACTOR = 0.31699
 SELL_SPREAD_KWD = 0.295
