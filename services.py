@@ -27,7 +27,7 @@ def get_live_gold():
     source_label = "SPOT XAU/USD"
 
     try:
-        tv_url = "https://tradingview.com"
+        tv_url = "".join(["https://", "scanner.", "://tradingview.com"])
         payload = {
             "symbols": {"tickers": ["OANDA:XAUUSD", "FX_IDC:XAUUSD"]},
             "columns": ["close", "open", "change", "change_abs"]
@@ -230,7 +230,8 @@ def generate_and_send_report(sheet_dashboard, send_notifications=False):
         if not tg_token:
             status_notes.append("❌ تيليجرام: مفتاح TELEGRAM_TOKEN غير موجود في Secrets.")
         else:
-            tg_url = f"https://telegram.org{tg_token}/sendMessage"
+            tg_url = "".join(["https://", "api.", "telegram.org/bot", tg_token, "/sendMessage"])
+
             res = requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": report_text[:4000], "parse_mode": "HTML"}, timeout=15)
             if res.status_code == 200:
                 status_notes.append("✅ تيليجرام: تم الإرسال بنجاح.")
@@ -244,7 +245,7 @@ def generate_and_send_report(sheet_dashboard, send_notifications=False):
 
         try:
             encoded_msg = urllib.parse.quote(re.sub(r"<[^>]+>", "", report_text)[:900])
-            wa_url = f"https://callmebot.com{config.WHATSAPP_PHONE}&apikey={config.WHATSAPP_APIKEY}&text={encoded_msg}"
+            wa_url = "".join(["https://", "api.", "://callmebot.com", str(config.WHATSAPP_PHONE), "&apikey=", str(config.WHATSAPP_APIKEY), "&text=", encoded_msg])
             wa_res = requests.get(wa_url, timeout=15)
             status_notes.append("✅ واتساب: تم الإرسال." if wa_res.status_code == 200 else f"⚠️ واتساب: كود {wa_res.status_code}")
         except Exception as e:
