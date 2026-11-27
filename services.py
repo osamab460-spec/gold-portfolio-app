@@ -26,7 +26,7 @@ def get_live_gold():
     source_label = "SPOT XAU/USD"
 
     try:
-        tv_url = "https://" + "://tradingview.com" + "/cfd/scan"
+        tv_url = "https://tradingview.com" + "/cfd/scan"
         payload = {
             "symbols": {"tickers": ["OANDA:XAUUSD", "FX_IDC:XAUUSD"]},
             "columns": ["close", "open", "change", "change_abs"]
