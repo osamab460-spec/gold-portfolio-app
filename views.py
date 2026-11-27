@@ -163,4 +163,43 @@ def render_add_trade(sheet_log):
     if st.button("✅ تسجيل العملية الآن"):
         final_price = round(price_input / grams, 4) if price_input > 150 else price_input
         today_str = datetime.now(config.KUWAIT_TZ).strftime("%Y-%m-%d")
-        sheet_log.append_row([today
+        sheet_log.append_row([today_str, op_type, final_price, grams], value_input_option="USER_ENTERED")
+        st.cache_data.clear()
+        st.success(f"تم تسجيل {op_type} {grams} جم بسعر {final_price} د.ك بنجاح!")
+
+def render_trade_log(sheet_log):
+    st.subheader("📜 سجل صفقات محفظتي")
+    all_rows = sheet_log.get_all_values()
+    if len(all_rows) > 1:
+        records = []
+        for r in reversed(all_rows[1:]):
+            if len(r) >= 4 and any(str(c).strip() for c in r[:4]):
+                date_val, op_val, price_val, grams_val = r[:4]
+                try:
+                    p = float(str(price_val).replace(",", ""))
+                    g = float(str(grams_val).replace(",", ""))
+                    tot = round(p * g, 3)
+                except ValueError:
+                    tot = 0.0
+                is_buy = "شراء" in str(op_val).replace("أ", "ا").strip()
+                records.append({
+                    "التاريخ": date_val,
+                    "العملية": f"🟢 {op_val}" if is_buy else f"🔴 {op_val}",
+                    "السعر (د.ك)": price_val,
+                    "الوزن (جم)": grams_val,
+                    "الإجمالي (د.ك)": f"{tot:,.3f}",
+                })
+        st.dataframe(pd.DataFrame(records), use_container_width=True, hide_index=True)
+    else:
+        st.info("لا توجد صفقات مسجلة في السجل حتى الآن.")
+
+    st.divider()
+    if st.button("🗑️ حذف آخر صفقة مسجلة") and len(all_rows) > 1:
+        last_idx = len(all_rows)
+        while last_idx > 1 and not any(str(c).strip() for c in all_rows[last_idx - 1]):
+            last_idx -= 1
+        if last_idx > 1:
+            sheet_log.delete_rows(last_idx)
+            st.cache_data.clear()
+            st.warning("تم حذف آخر صفقة وتحديث الرصيد!")
+            st.rerun()
