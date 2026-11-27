@@ -17,8 +17,7 @@ WHATSAPP_PHONE = _get_secret("WHATSAPP_PHONE", "96597894119")
 WHATSAPP_APIKEY = _get_secret("WHATSAPP_APIKEY", "9510859")
 
 KUWAIT_TZ = pytz.timezone("Asia/Kuwait")
-RSS_NEWS_URL = "https://" + "://google.com" + "/rss/search?q=gold+price+XAUUSD+FOMC+CPI+Fed&hl=en-US&gl=US&ceid=US:en"
-
+RSS_NEWS_URL = "https://google.com"
 OUNCE_TO_GRAM = 31.1035
 KUWAIT_FACTOR = 0.31699
 SELL_SPREAD_KWD = 0.295
