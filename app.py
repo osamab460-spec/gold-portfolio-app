@@ -4,7 +4,10 @@ import streamlit as st
 import services
 import views
 
-st.set_page_config(page_title="دار السبائك AI", page_icon="🪙", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="دار السبائك AI", page_icon="🪙", layout="centered",
+    initial_sidebar_state="collapsed",
+)
 
 css_style = (
     "<style>"
@@ -41,7 +44,11 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.markdown('<div style="text-align:center; padding:20px;"><span class="sabaek-logo">🪙 دار السبائك AI</span></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div style="text-align:center; padding:20px;">'
+        '<span class="sabaek-logo">🪙 دار السبائك AI</span></div>',
+        unsafe_allow_html=True,
+    )
     pin_input = st.text_input("أدخل الرقم السري للدخول", type="password", max_chars=8)
     if st.button("🔓 دخول المحفظة"):
         if pin_input == str(APP_PIN):
@@ -74,12 +81,17 @@ def live_sabaek_karats():
         if ounce > 0 and (now_ts - last_sync) >= 300:
             sheet_dashboard.update_acell("C5", ounce)
             st.session_state["last_sheet_sync"] = now_ts
+            st.cache_data.clear()  # لضمان قراءة المحفظة بأحدث بيانات
 
         ticker_html = (
-            f'<div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span><span style="color:#555555; font-size:0.8rem;">{src_lbl} • 15ث ⏱️</span></div>'
+            f'<div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span>'
+            f'<span style="color:#555555; font-size:0.8rem;">{src_lbl} • 15ث ⏱️</span></div>'
             '<div class="gold-ticker-box">'
-            f'<div class="gold-ticker-title"><span>🪙 GOLD SPOT (XAU/USD)</span><span style="color:#E6C25A;">بيع 24: {sell_24k:.3f} د.ك</span></div>'
-            f'<div class="gold-ticker-price"><span class="{color_cls}">{ounce:,.3f}</span><span style="font-size:0.9rem; color:#BDBDBD;"> USD </span><span class="{color_cls}" style="font-size:0.95rem;">{arrow} {chp:+.2f}%</span></div>'
+            f'<div class="gold-ticker-title"><span>🪙 GOLD SPOT (XAU/USD)</span>'
+            f'<span style="color:#E6C25A;">بيع 24: {sell_24k:.3f} د.ك</span></div>'
+            f'<div class="gold-ticker-price"><span class="{color_cls}">{ounce:,.3f}</span>'
+            f'<span style="font-size:0.9rem; color:#BDBDBD;"> USD </span>'
+            f'<span class="{color_cls}" style="font-size:0.95rem;">{arrow} {chp:+.2f}%</span></div>'
             '</div>'
             '<div class="karats-grid">'
             f'<div class="karat-item"><div class="karat-name">شراء ٢٤</div><div class="karat-val {color_cls}">{buy_24k:.3f} د.ك</div></div>'
@@ -99,16 +111,18 @@ buy_24k = st.session_state.get("live_buy_24k", 0.0)
 sell_24k = st.session_state.get("live_sell_24k", 0.0)
 
 def _extract_num(val_str):
-    nums = re.findall(r"[-+]?\d*\.\d+|\d+", str(val_str).replace(",", ""))
-    return float(next(iter(nums))) if nums else 0.0
+    nums = re.findall(r"[-+]?\d*\.?\d+", str(val_str).replace(",", ""))
+    return float(nums[0]) if nums else 0.0
 
 @st.cache_data(ttl=60)
 def _get_portfolio_summary():
+    """يقرأ A15:D15 ويعيد (الرصيد B, إجمالي التكلفة C, متوسط D) — مع مراعاة ترتيب الأعمدة."""
     row = sheet_dashboard.get("A15:D15")
-    vals = next(iter(row)) if row else []
+    vals = next(iter(row), []) if row else []
     padded = (list(vals) + ["0", "0", "0", "0"])[:4]
-    b, c, _, a = padded
-    return b, c, a
+    # وفق وصفك: A=label، B=رصيد، C=إجمالي التكلفة، D=متوسط
+    b, c, d = padded[1], padded[2], padded[3]
+    return str(b).strip() or "0", str(c).strip() or "0", str(d).strip() or "0"
 
 gold_balance_str, total_cost_str, avg_cost_str = _get_portfolio_summary()
 
@@ -122,7 +136,11 @@ if curr_avg <= 0 and curr_grams > 0 and curr_total_cost > 0:
 
 net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3) if (curr_grams > 0 and sell_24k > 0) else 0.0
 
-page = st.radio("القائمة", ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"], horizontal=True, label_visibility="collapsed")
+page = st.radio(
+    "القائمة",
+    ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"],
+    horizontal=True, label_visibility="collapsed",
+)
 st.write("")
 
 if page == "🏠 الرئيسية والشموع":
