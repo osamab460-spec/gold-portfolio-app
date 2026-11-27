@@ -131,3 +131,124 @@ def get_candlestick_data(timeframe="1m", unit="KWD"):
     else:
         df = df.round(2)
     return df
+@st.cache_data(ttl=300)
+def get_chart_and_technicals():
+    ticker = yf.Ticker("GC=F")
+    hist = ticker.history(period="1mo")
+    if hist.empty:
+        return hist, "لا تتوفر بيانات تاريخية كافية حالياً."
+
+    high_30d = round(float(hist["High"].max()), 2)
+    low_30d = round(float(hist["Low"].min()), 2)
+    sma_20 = round(float(hist["Close"].tail(20).mean()), 2)
+
+    delta = hist["Close"].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    last_loss = float(loss.iloc[-1]) if not pd.isna(loss.iloc[-1]) else 0.0
+    last_gain = float(gain.iloc[-1]) if not pd.isna(gain.iloc[-1]) else 0.0
+
+    if last_loss == 0:
+        rsi = 100.0 if last_gain > 0 else 50.0
+    else:
+        rs = last_gain / last_loss
+        rsi = round(100 - (100 / (1 + rs)), 1)
+
+    tech_summary = f"أعلى سعر 30 يوم: {high_30d}$ | أدنى سعر 30 يوم: {low_30d}$ | المتوسط المتحرك 20 يوم: {sma_20}$ | مؤشر القوة النسبية (RSI 14): {rsi}"
+    return hist, tech_summary
+
+@st.cache_data(ttl=600)
+def _get_cached_news():
+    try:
+        res = requests.get(config.RSS_NEWS_URL, timeout=4)
+        feed = feedparser.parse(res.content)
+        return "\n".join([entry.title for entry in feed.entries[:6]])
+    except Exception:
+        return "لا توجد أخبار عاجلة حالياً."
+
+@st.cache_data(ttl=3600)
+def _get_available_flash_models():
+    models = ["gemini-3.8-flash", "gemini-3-flash-preview"]
+    try:
+        for m in ai_client.models.list():
+            name = m.name.replace("models/", "")
+            if "flash" in name and name not in models:
+                models.append(name)
+    except Exception:
+        pass
+    return models
+
+def _call_gemini_safe(prompt):
+    last_error = ""
+    for model_name in _get_available_flash_models():
+        try:
+            res = ai_client.models.generate_content(model=model_name, contents=prompt)
+            return res.text
+        except Exception as e:
+            last_error = str(e)
+            continue
+    return f"⚠️ تعذر الاتصال بالذكاء الاصطناعي. السبب: {last_error}"
+
+def ask_ai_advisor(user_question, ounce, buy_24k, sell_24k, portfolio_rows):
+    prompt = (
+        "أنت حاسبة ذكية ومستشار مالي لمحفظة ذهب (دار السبائك - الكويت). أجب باختصار شديد وبالعربية:\n"
+        f"- سعر الشراء 24: {buy_24k} د.ك | سعر البيع 24: {sell_24k} د.ك | الأونصة الفورية: {ounce}$\n"
+        f"- بيانات المحفظة: {portfolio_rows}\n"
+        f"- سؤال المستخدم: {user_question}"
+    )
+    return _call_gemini_safe(prompt)
+
+def suggest_best_buy_zones(ounce, buy_24k, avg_cost, balance):
+    _, tech_summary = get_chart_and_technicals()
+    news_text = _get_cached_news()
+    prompt = config.build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text)
+    return _call_gemini_safe(prompt)
+
+def generate_and_send_report(sheet_dashboard, send_notifications=False):
+    data = get_live_gold()
+    ounce, ch, chp, buy_24k = data["ounce"], data["ch"], data["chp"], data["buy_24k"]
+    if ounce > 0:
+        sheet_dashboard.update_acell("C5", ounce)
+
+    portfolio_rows = sheet_dashboard.get("A5:I18")
+    portfolio_text = "\n".join([" | ".join(r) for r in portfolio_rows if r])
+    targets_rows = sheet_dashboard.get("A19:B21")
+    targets_text = "\n".join([" | ".join(r) for r in targets_rows if r])
+
+    news_text = _get_cached_news()
+
+    now_kw = datetime.now(config.KUWAIT_TZ).strftime("%A, %Y-%m-%d %H:%M")
+    prompt = config.build_report_prompt(now_kw, ounce, ch, chp, buy_24k, portfolio_text, targets_text, news_text)
+
+    report_text = _call_gemini_safe(prompt)
+    status_notes = []
+
+    if send_notifications and not report_text.startswith("⚠️"):
+        raw_tg = st.secrets.get("TELEGRAM_TOKEN", "").strip().strip('"').strip("'")
+        tg_token = next(iter(raw_tg.split("bot")[-1].split("/"))) if ("bot" in raw_tg and "/" in raw_tg) else raw_tg
+
+        if not tg_token:
+            status_notes.append("❌ تيليجرام: مفتاح TELEGRAM_TOKEN غير موجود في Secrets.")
+        else:
+            tg_url = f"https://telegram.org{tg_token}/sendMessage"
+            res = requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": report_text[:4000], "parse_mode": "HTML"}, timeout=15)
+            if res.status_code == 200:
+                status_notes.append("✅ تيليجرام: تم الإرسال بنجاح.")
+            else:
+                clean_text = re.sub(r"<[^>]+>", "", report_text)[:4000]
+                res_plain = requests.post(tg_url, json={"chat_id": config.CHAT_ID, "text": clean_text}, timeout=15)
+                if res_plain.status_code == 200:
+                    status_notes.append("✅ تيليجرام: تم الإرسال بنجاح (نص عادي).")
+                else:
+                    status_notes.append(f"❌ تيليجرام فشل ({res_plain.status_code}): {res_plain.text}")
+
+        try:
+            encoded_msg = urllib.parse.quote(re.sub(r"<[^>]+>", "", report_text)[:900])
+            wa_url = f"https://callmebot.com{config.WHATSAPP_PHONE}&apikey={config.WHATSAPP_APIKEY}&text={encoded_msg}"
+            wa_res = requests.get(wa_url, timeout=15)
+            status_notes.append("✅ واتساب: تم الإرسال." if wa_res.status_code == 200 else f"⚠️ واتساب: كود {wa_res.status_code}")
+        except Exception as e:
+            status_notes.append(f"⚠️ واتساب: {e}")
+
+    header_status = "<br>".join(status_notes) + "<hr>" if status_notes else ""
+    return header_status + report_text
