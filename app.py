@@ -81,7 +81,7 @@ def live_sabaek_karats():
         if ounce > 0 and (now_ts - last_sync) >= 300:
             sheet_dashboard.update_acell("C5", ounce)
             st.session_state["last_sheet_sync"] = now_ts
-            st.cache_data.clear()  # لضمان قراءة المحفظة بأحدث بيانات
+            st.cache_data.clear()
 
         ticker_html = (
             f'<div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span>'
@@ -111,16 +111,19 @@ buy_24k = st.session_state.get("live_buy_24k", 0.0)
 sell_24k = st.session_state.get("live_sell_24k", 0.0)
 
 def _extract_num(val_str):
-    nums = re.findall(r"[-+]?\d*\.?\d+", str(val_str).replace(",", ""))
+    """استخراج الرقم فقط وتجاهل أي رموز عملة (مثل $ أو د.ك)"""
+    clean_str = str(val_str).replace(",", "").replace("$", "").replace("د.ك", "").replace("ك", "").strip()
+    nums = re.findall(r"[-+]?\d*\.?\d+", clean_str)
     return float(nums[0]) if nums else 0.0
 
 @st.cache_data(ttl=60)
 def _get_portfolio_summary():
-    """يقرأ A15:D15 ويعيد (الرصيد B, إجمالي التكلفة C, متوسط D) — مع مراعاة ترتيب الأعمدة."""
+    """قراءة الخلايا A15:D15 مع التأكد من أخذ الأرقام الصحيحة"""
     row = sheet_dashboard.get("A15:D15")
     vals = next(iter(row), []) if row else []
     padded = (list(vals) + ["0", "0", "0", "0"])[:4]
-    # وفق وصفك: A=label، B=رصيد، C=إجمالي التكلفة، D=متوسط
+    
+    # نفترض أن B=رصيد، C=تكلفة، D=متوسط
     b, c, d = padded[1], padded[2], padded[3]
     return str(b).strip() or "0", str(c).strip() or "0", str(d).strip() or "0"
 
@@ -130,12 +133,21 @@ curr_grams = _extract_num(gold_balance_str)
 curr_total_cost = _extract_num(total_cost_str)
 curr_avg = _extract_num(avg_cost_str)
 
+# حل مشكلة متوسط التكلفة إذا كان مفقوداً أو خاطئاً
 if curr_avg <= 0 and curr_grams > 0 and curr_total_cost > 0:
+    # إذا كانت التكلفة تحتوي على $ (دولار)، نحولها تقريبياً للدينار (0.31)
+    if "$" in total_cost_str:
+        curr_total_cost = curr_total_cost * 0.31 
     curr_avg = round(curr_total_cost / curr_grams, 3)
     avg_cost_str = f"{curr_avg:.3f}"
 
-net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3) if (curr_grams > 0 and sell_24k > 0) else 0.0
+# حساب صافي الربح (تأكد من وجود أرقام منطقية)
+if curr_grams > 0 and sell_24k > 0 and curr_avg > 0:
+    net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3)
+else:
+    net_pnl_kwd = 0.0
 
+# عرض الصفحات
 page = st.radio(
     "القائمة",
     ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"],
