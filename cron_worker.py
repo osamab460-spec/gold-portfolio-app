@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import requests
 import feedparser
@@ -8,13 +9,10 @@ from google import genai
 import yfinance as yf
 import config
 
-SLASH = chr(47)
-SCHEME = "https:" + SLASH + SLASH
-
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"].strip().strip('"').strip("'")
 RAW_TG_TOKEN = os.environ.get("TELEGRAM_TOKEN", "").strip().strip('"').strip("'")
-if "bot" in RAW_TG_TOKEN and SLASH in RAW_TG_TOKEN:
-    TELEGRAM_TOKEN = RAW_TG_TOKEN.split("bot")[-1].split(SLASH)
+if "bot" in RAW_TG_TOKEN and "/" in RAW_TG_TOKEN:
+    TELEGRAM_TOKEN = next(iter(RAW_TG_TOKEN.split("bot")[-1].split("/")))
 else:
     TELEGRAM_TOKEN = RAW_TG_TOKEN
 
@@ -26,7 +24,19 @@ ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 def get_spot_ounce():
     try:
-        sq_url = SCHEME + "://swissquote.com" + SLASH + "public-quotes" + SLASH + "bboquotes" + SLASH + "instrument" + SLASH + "XAU" + SLASH + "USD"
+        tv_url = "https://tradingview.com"
+        payload = {"symbols": {"tickers": ["OANDA:XAUUSD"]}, "columns": ["close"]}
+        tv_res = requests.post(tv_url, json=payload, timeout=6).json()
+        rows = tv_res.get("data", [])
+        if rows:
+            vals = next(iter(rows)).get("d", [])
+            if vals and float(next(iter(vals))) > 0:
+                return round(float(next(iter(vals))), 3)
+    except Exception:
+        pass
+
+    try:
+        sq_url = "https://swissquote.com"
         data = requests.get(sq_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=6).json()
         p = next(iter(next(iter(data)).get("spreadProfilePrices", [])))
         return round((float(p["bid"]) + float(p["ask"])) / 2, 3)
@@ -45,19 +55,29 @@ def call_gemini_safe(prompt):
 def send_all_channels(title, html_message, is_urgent=False):
     if TELEGRAM_TOKEN and ":" in TELEGRAM_TOKEN and CHAT_ID:
         try:
-            tg_url = SCHEME + "api.telegram.org" + SLASH + "bot" + TELEGRAM_TOKEN + SLASH + "sendMessage"
-            requests.post(tg_url, json={"chat_id": CHAT_ID, "text": html_message, "parse_mode": "HTML"}, timeout=15)
+            tg_url = f"https://telegram.org{TELEGRAM_TOKEN}/sendMessage"
+            r = requests.post(tg_url, json={"chat_id": CHAT_ID, "text": html_message[:4000], "parse_mode": "HTML"}, timeout=15)
+            if r.status_code != 200:
+                plain_tg = re.sub(r"<[^>]+>", "", html_message)[:4000]
+                r2 = requests.post(tg_url, json={"chat_id": CHAT_ID, "text": plain_tg}, timeout=15)
+                print("Telegram fallback status:", r2.status_code, r2.text)
+            else:
+                print("Telegram sent OK")
         except Exception as e:
             print("Telegram warning:", e)
 
     if NTFY_TOPIC:
         try:
-            plain_text = html_message.replace("<b>", "").replace("</b>", "")
-            ntfy_url = SCHEME + "ntfy.sh" + SLASH + NTFY_TOPIC
+            plain_text = re.sub(r"<[^>]+>", "", html_message)
+            ntfy_url = f"https://ntfy.sh{NTFY_TOPIC}"
             requests.post(
                 ntfy_url,
                 data=plain_text.encode("utf-8"),
-                headers={"Title": title.encode("utf-8"), "Priority": "urgent" if is_urgent else "high", "Tags": "rotating_light" if is_urgent else "coin"},
+                headers={
+                    "Title": title.encode("utf-8"),
+                    "Priority": "urgent" if is_urgent else "high",
+                    "Tags": "rotating_light" if is_urgent else "coin"
+                },
                 timeout=15
             )
         except Exception as e:
@@ -166,12 +186,14 @@ def run_quarter_hourly_monitor():
     targets_text = "\n".join([" | ".join(r) for r in sheet_dashboard.get("A19:B21") if r])
 
     if alert_header:
-        alert_prompt = f"""أنت مستشاري المالي لأسواق الذهب في الكويت (دار السبائك).
-حدث الآن تحرك سعري هام: {alert_header}
-- السعر الحالي للأونصة: {ounce}$ (تغير ربع ساعة: {diff_15m:+}$ | تغير ساعة: {diff_1h:+}$)
-- سعر شراء جرام 24 في دار السبائك: {buy_24k} د.ك | سعر البيع: {sell_24k} د.ك
-- بيانات محفظتي: {portfolio_text}
-اكتب تنبيهاً عاجلاً ومختصراً جداً (4 أسطر فقط) بتنسيق HTML لتيليجرام (استخدم <b> فقط)."""
+        alert_prompt = (
+            "أنت مستشاري المالي لأسواق الذهب في الكويت (دار السبائك).\n"
+            f"حدث الآن تحرك سعري هام: {alert_header}\n"
+            f"- السعر الحالي للأونصة: {ounce}$ (تغير ربع ساعة: {diff_15m:+}$ | تغير ساعة: {diff_1h:+}$)\n"
+            f"- سعر شراء جرام 24 في دار السبائك: {buy_24k} د.ك | سعر البيع: {sell_24k} د.ك\n"
+            f"- بيانات محفظتي: {portfolio_text}\n"
+            "اكتب تنبيهاً عاجلاً ومختصراً جداً (4 أسطر فقط) بتنسيق HTML لتيليجرام (استخدم <b> فقط)."
+        )
         full_alert = f"{alert_header}\n\n{call_gemini_safe(alert_prompt)}"
         send_all_channels(f"إنذار ذهب عاجل: {buy_24k} د.ك", full_alert, is_urgent=True)
 
@@ -181,9 +203,12 @@ def run_quarter_hourly_monitor():
         headlines = " | ".join([entry.title for entry in feed.entries[:8]])
         macro_keywords = ("CPI", "FOMC", "Fed", "NFP", "Non-Farm", "Powell", "Interest Rate", "Inflation")
         if any(k.lower() in headlines.lower() for k in macro_keywords):
-            macro_prompt = f"""أنت محلل أسواق الذهب. افحص عناوين الأخبار التالية اليوم ({now_kw}):
-{headlines}
-إذا كان هناك بيان اقتصادي أمريكي هام يصدر اليوم (مثل التضخم CPI، الفائدة الفيدرالية FOMC، أو الوظائف NFP)، اكتب تنبيهاً تحذيرياً من 3 أسطر فقط بتنسيق HTML (وسم <b> فقط) يوضح موعد الخبر المتوقع بتوقيت الكويت وتأثيره المحتمل على الذهب."""
+            macro_prompt = (
+                f"أنت محلل أسواق الذهب. افحص عناوين الأخبار التالية اليوم ({now_kw}):\n"
+                f"{headlines}\n"
+                "إذا كان هناك بيان اقتصادي أمريكي هام يصدر اليوم (مثل التضخم CPI، الفائدة الفيدرالية FOMC، أو الوظائف NFP)، "
+                "اكتب تنبيهاً تحذيرياً من 3 أسطر فقط بتنسيق HTML (وسم <b> فقط) يوضح موعد الخبر المتوقع بتوقيت الكويت وتأثيره المحتمل على الذهب."
+            )
             macro_msg = "📅⚠️ <b>تنبيه أخبار اقتصادية هامة اليوم:</b>\n\n" + call_gemini_safe(macro_prompt)
             send_all_channels("⚠️ بيان اقتصادي أمريكي مؤثر اليوم", macro_msg, is_urgent=True)
 
