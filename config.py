@@ -12,14 +12,27 @@ def _get_secret(key, default=""):
 SPREADSHEET_ID = "11s82rxEoX0TwGgzyp8LTYC2XeWJK9Jp3hk_KS14szuo"
 SHEET_DASHBOARD_NAME = "لوحة التحليل العام"
 SHEET_LOG_NAME = "سجل العمليات"
+SHEET_ALERTS_NAME = "التنبيهات"
 
 # ================= إعدادات التنبيهات =================
 CHAT_ID = _get_secret("CHAT_ID", "7342639951")
 WHATSAPP_PHONE = _get_secret("WHATSAPP_PHONE", "96597894119")
 WHATSAPP_APIKEY = _get_secret("WHATSAPP_APIKEY", "9510859")
+NTFY_TOPIC = _get_secret("NTFY_TOPIC", "semsem_gold_kw_99")
 
 KUWAIT_TZ = pytz.timezone("Asia/Kuwait")
-RSS_NEWS_URL = "https://google.com"
+
+# ✅ روابط RSS حقيقية ومتعددة (احتياطية)
+RSS_NEWS_URLS = [
+    "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+    "https://www.investing.com/rss/news_285.rss",
+    "https://feeds.bbci.co.uk/news/business/rss.xml",
+    "https://finance.yahoo.com/news/rssindex",
+]
+RSS_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+}
 
 # ================= معادلات التسعير (دار السبائك - الكويت) =================
 OUNCE_TO_GRAM = 31.1035
@@ -27,6 +40,14 @@ KUWAIT_FACTOR = 0.31699
 SELL_SPREAD_KWD = 0.295
 ZAKAT_NISAB_GRAMS = 85.0
 ZAKAT_RATE = 0.025
+
+# ================= نماذج Gemini المتاحة فعلياً =================
+GEMINI_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+]
 
 def build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text):
     return (
