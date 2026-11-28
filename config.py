@@ -2,7 +2,6 @@ import os
 import pytz
 import streamlit as st
 
-
 def _get_secret(key, default=""):
     """يقرأ القيمة من st.secrets أولاً ثم من متغيرات البيئة، مع تنظيف آمن."""
     try:
@@ -12,7 +11,6 @@ def _get_secret(key, default=""):
     except Exception:
         pass
     return str(os.environ.get(key, default)).strip()
-
 
 # ================= إعدادات Google Sheets =================
 SPREADSHEET_ID = "11s82rxEoX0TwGgzyp8LTYC2XeWJK9Jp3hk_KS14szuo"
@@ -49,14 +47,13 @@ SELL_SPREAD_KWD = 0.295
 ZAKAT_NISAB_GRAMS = 85.0
 ZAKAT_RATE = 0.025
 
-# ================= نماذج Gemini المتاحة فعلياً =================
+# ================= نماذج Gemini المتاحة (تم التحديث) =================
 GEMINI_MODELS = [
     "gemini-2.5-flash",
     "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
+    "gemini-1.5-pro",
 ]
-
 
 def build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text):
     return (
@@ -74,7 +71,6 @@ def build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news
         "   - الدفعة الثالثة (قاع قوي/قنص): السعر بالدولار + السعر بالكويتي + نسبة السيولة المقترحة.\n"
         "3. نصيحة لإدارة المخاطر بناءً على الأخبار القادمة."
     )
-
 
 def build_report_prompt(now_kw, ounce, ch, chp, buy_24k, portfolio_text, targets_text, news_text):
     return (
