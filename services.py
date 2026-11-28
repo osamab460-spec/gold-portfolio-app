@@ -21,53 +21,45 @@ def init_sheets():
     sh = gc.open_by_key(config.SPREADSHEET_ID)
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
-# ================== السعر الحي (GoldAPI + Fallback) ==================
-@st.cache_data(ttl=60) # زيادة الوقت لتقليل استهلاك API
+# ================== السعر الحي (مدمج ومحسن) ==================
+@st.cache_data(ttl=30)
 def get_live_gold():
     ounce = 0.0
     chp = 0.0
     buy_24k = 0.0
     sell_24k = 0.0
-    source_label = "TradingView (Fallback)"
+    source_label = "Live Market Data"
 
-    # 1) محاولة جلب السعر من GoldAPI.io
-    api_key = st.secrets.get("GOLDAPI_KEY", "")
-    if api_key:
-        try:
-            url = "https://www.goldapi.io/api/XAU/KWD"
-            headers = {
-                "x-access-token": api_key,
-                "Content-Type": "application/json"
-            }
-            res = requests.get(url, headers=headers, timeout=10)
-            if res.status_code == 200:
-                data = res.json()
-                # GoldAPI يعيد سعر الجرام بالدينار الكويتي مباشرة
-                buy_24k = round(data.get("price_gram_24k", 0.0), 3)
-                # هامش البيع (السبريد) - يمكنك تعديله ليطابق دار السبائك
-                sell_24k = round(buy_24k - 0.295, 3) 
-                ounce = round(data.get("price", 0.0), 3) # سعر الأونصة
-                source_label = "GoldAPI.io"
-            else:
-                print(f"GoldAPI Error: {res.status_code}")
-        except Exception as e:
-            print(f"GoldAPI Exception: {e}")
+    # 1) جلب السعر العالمي للأونصة من TradingView
+    try:
+        tv_url = "https://scanner.tradingview.com/symbol?symbol=OANDA%3AXAUUSD&fields=close,change"
+        tv_res = requests.get(tv_url, headers=config.RSS_HEADERS, timeout=6).json()
+        if isinstance(tv_res, dict) and tv_res.get("close"):
+            ounce = round(float(tv_res["close"]), 3)
+            chp = round(float(tv_res.get("change") or 0.0), 2)
+    except Exception:
+        pass
 
-    # 2) خطة بديلة (Fallback) في حال فشل GoldAPI
-    if buy_24k <= 0:
-        try:
-            tv_url = "https://scanner.tradingview.com/symbol?symbol=OANDA%3AXAUUSD&fields=close,change"
-            tv_res = requests.get(tv_url, headers=config.RSS_HEADERS, timeout=6).json()
-            if isinstance(tv_res, dict) and tv_res.get("close"):
-                ounce = round(float(tv_res["close"]), 3)
-                chp = round(float(tv_res.get("change") or 0.0), 2)
-                buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
-                sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
-                source_label = "TradingView (Fallback)"
-        except Exception:
-            pass
+    # 2) جلب سعر صرف الدولار مقابل الدينار الكويتي
+    usd_kwd = 0.3070  # قيمة احتياطية تقريبية
+    try:
+        fx_url = "https://scanner.tradingview.com/symbol?symbol=FX_IDC%3AUSDKWD&fields=close"
+        fx_res = requests.get(fx_url, headers=config.RSS_HEADERS, timeout=6).json()
+        if isinstance(fx_res, dict) and fx_res.get("close"):
+            usd_kwd = float(fx_res["close"])
+    except Exception:
+        pass
 
-    # 3) حساب باقي العيارات بناءً على سعر عيار 24
+    # 3) حساب سعر الجرام بالدينار
+    if ounce > 0:
+        # سعر الجرام العالمي بالدولار
+        gram_usd = ounce / config.OUNCE_TO_GRAM
+        # سعر الشراء بالدينار (نضيف هامش بسيط)
+        buy_24k = round(gram_usd * usd_kwd, 3)
+        # سعر البيع بالدينار (نطرح هامش دار السبائك)
+        sell_24k = round(buy_24k - 0.295, 3)
+
+    # حساب باقي العيارات
     k22_buy = round(buy_24k * (22 / 24), 3)
     k21_buy = round(buy_24k * (21 / 24), 3)
     k18_buy = round(buy_24k * (18 / 24), 3)
