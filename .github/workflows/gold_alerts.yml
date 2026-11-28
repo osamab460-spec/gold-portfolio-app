@@ -2,13 +2,24 @@ name: Semsem Gold Alerts
 
 on:
   schedule:
-    # يعمل تلقائياً كل ربع ساعة (15 دقيقة) على مدار اليوم
+    # كل 15 دقيقة (UTC). الكويت = UTC+3، فالدورة تشمل 10:00/14:00/18:00/22:00 بتوقيت الكويت تلقائياً.
     - cron: '*/15 * * * *'
-  workflow_dispatch: # يتيح لك تشغيله يدوياً في أي وقت
+  workflow_dispatch:
+
+# يمنع تداخل تشغيلين متزامنين إذا تأخر تشغيل سابق
+concurrency:
+  group: gold-alerts
+  cancel-in-progress: false
 
 jobs:
   send-report:
     runs-on: ubuntu-latest
+
+    # مهم: GitHub يضبط GITHUB_EVENT_NAME تلقائياً، لكن نُمرّره صراحةً
+    # لضمان عمل cron_worker.py عند التشغيل اليدوي (workflow_dispatch)
+    env:
+      GITHUB_EVENT_NAME: ${{ github.event_name }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -17,13 +28,20 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Run Gold Alert Worker
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          WHATSAPP_APIKEY: ${{ secrets.WHATSAPP_APIKEY }}
         run: python cron_worker.py
