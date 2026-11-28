@@ -5,7 +5,9 @@ import services
 import views
 
 st.set_page_config(
-    page_title="دار السبائك AI", page_icon="🪙", layout="centered",
+    page_title="دار السبائك AI",
+    page_icon="🪙",
+    layout="centered",
     initial_sidebar_state="collapsed",
 )
 
@@ -34,11 +36,13 @@ st.markdown(css_style, unsafe_allow_html=True)
 
 sheet_dashboard, sheet_log = services.init_sheets()
 
+# ==================== مسار الـ Cron (GitHub Actions / Make.com) ====================
 if st.query_params.get("cron") == "run":
     services.generate_and_send_report(sheet_dashboard, send_notifications=True)
     st.success("CRON_OK")
     st.stop()
 
+# ==================== المصادقة ====================
 APP_PIN = st.secrets.get("APP_PIN", "1234")
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -58,6 +62,8 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
+
+# ==================== الشريط الحي (كل 15 ثانية) ====================
 @st.fragment(run_every=15)
 def live_sabaek_karats():
     try:
@@ -72,16 +78,24 @@ def live_sabaek_karats():
         st.session_state["live_sell_24k"] = sell_24k
 
         prev_ounce = st.session_state.get("prev_tick_ounce", ounce)
-        color_cls = "price-up" if ounce > prev_ounce else ("price-down" if ounce < prev_ounce else "price-same")
-        arrow = "▲" if ounce > prev_ounce else ("▼" if ounce < prev_ounce else "•")
+        if ounce > prev_ounce:
+            color_cls, arrow = "price-up", "▲"
+        elif ounce < prev_ounce:
+            color_cls, arrow = "price-down", "▼"
+        else:
+            color_cls, arrow = "price-same", "•"
         st.session_state["prev_tick_ounce"] = ounce
 
+        # مزامنة دورية مع Google Sheets (كل 5 دقائق) — مسح cache محدد فقط
         now_ts = time.time()
         last_sync = st.session_state.get("last_sheet_sync", 0)
         if ounce > 0 and (now_ts - last_sync) >= 300:
-            sheet_dashboard.update_acell("C5", ounce)
-            st.session_state["last_sheet_sync"] = now_ts
-            st.cache_data.clear()
+            try:
+                sheet_dashboard.update_acell("C5", ounce)
+                st.session_state["last_sheet_sync"] = now_ts
+                services.get_live_gold.clear()
+            except Exception:
+                pass
 
         ticker_html = (
             f'<div class="sabaek-top"><span class="sabaek-logo">🪙 دار السبائك AI</span>'
@@ -104,28 +118,52 @@ def live_sabaek_karats():
     except Exception as e:
         st.error(f"خطأ في تحديث العيارات: {e}")
 
+
 live_sabaek_karats()
 
 ounce = st.session_state.get("live_ounce", 0.0)
 buy_24k = st.session_state.get("live_buy_24k", 0.0)
 sell_24k = st.session_state.get("live_sell_24k", 0.0)
 
+
+# ==================== استخراج الأرقام ====================
 def _extract_num(val_str):
-    """استخراج الرقم فقط وتجاهل أي رموز عملة (مثل $ أو د.ك)"""
-    clean_str = str(val_str).replace(",", "").replace("$", "").replace("د.ك", "").replace("ك", "").strip()
+    """استخراج الرقم فقط وتجاهل أي رموز عملة (مثل $ أو د.ك)."""
+    if val_str is None:
+        return 0.0
+    clean_str = (
+        str(val_str)
+        .replace(",", "")
+        .replace("$", "")
+        .replace("د.ك", "")
+        .replace("ك", "")
+        .strip()
+    )
     nums = re.findall(r"[-+]?\d*\.?\d+", clean_str)
     return float(nums[0]) if nums else 0.0
 
+
 @st.cache_data(ttl=60)
 def _get_portfolio_summary():
-    """قراءة الخلايا A15:D15 مع التأكد من أخذ الأرقام الصحيحة"""
-    row = sheet_dashboard.get("A15:D15")
+    """
+    قراءة الخلايا A15:D15 بقيمها المحسوبة (UNFORMATTED) لضمان الحصول على أرقام لا صيغ.
+    الترتيب: A=رصيد الذهب، B=القيمة السوقية (د.ك)، C=القيمة السوقية ($)، D=متوسط التكلفة (د.ك)
+    """
+    try:
+        row = sheet_dashboard.get(
+            "A15:D15", value_render_option="UNFORMATTED_VALUE"
+        )
+    except Exception:
+        return "0", "0", "0"
+
     vals = next(iter(row), []) if row else []
     padded = (list(vals) + ["0", "0", "0", "0"])[:4]
-    
-    # نفترض أن B=رصيد، C=تكلفة، D=متوسط
-    b, c, d = padded[1], padded[2], padded[3]
-    return str(b).strip() or "0", str(c).strip() or "0", str(d).strip() or "0"
+    # A15 = رصيد الذهب، D15 = متوسط التكلفة، B15 = القيمة السوقية (نستخدمها كتكلفة بديلة إن لزم)
+    gold_balance = padded[0]
+    market_value_kwd = padded[1]
+    avg_cost = padded[3]
+    return str(gold_balance), str(market_value_kwd), str(avg_cost)
+
 
 gold_balance_str, total_cost_str, avg_cost_str = _get_portfolio_summary()
 
@@ -135,30 +173,39 @@ curr_avg = _extract_num(avg_cost_str)
 
 # حل مشكلة متوسط التكلفة إذا كان مفقوداً أو خاطئاً
 if curr_avg <= 0 and curr_grams > 0 and curr_total_cost > 0:
-    # إذا كانت التكلفة تحتوي على $ (دولار)، نحولها تقريبياً للدينار (0.31)
-    if "$" in total_cost_str:
-        curr_total_cost = curr_total_cost * 0.31 
     curr_avg = round(curr_total_cost / curr_grams, 3)
     avg_cost_str = f"{curr_avg:.3f}"
 
-# حساب صافي الربح (تأكد من وجود أرقام منطقية)
+# حساب صافي الربح (على أساس سعر البيع الحالي مقابل متوسط التكلفة)
 if curr_grams > 0 and sell_24k > 0 and curr_avg > 0:
     net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3)
 else:
     net_pnl_kwd = 0.0
 
-# عرض الصفحات
+
+# ==================== القائمة ====================
 page = st.radio(
     "القائمة",
-    ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"],
-    horizontal=True, label_visibility="collapsed",
+    [
+        "🏠 الرئيسية والشموع",
+        "🎯 مناطق الشراء",
+        "🧮 الحاسبة والزكاة",
+        "➕ صفقة",
+        "📜 السجل",
+    ],
+    horizontal=True,
+    label_visibility="collapsed",
 )
 st.write("")
 
 if page == "🏠 الرئيسية والشموع":
-    views.render_home_and_chart(gold_balance_str, total_cost_str, avg_cost_str, curr_avg, net_pnl_kwd)
+    views.render_home_and_chart(
+        gold_balance_str, total_cost_str, avg_cost_str, curr_avg, net_pnl_kwd
+    )
 elif page == "🎯 مناطق الشراء":
-    views.render_buy_zones(sheet_dashboard, ounce, buy_24k, sell_24k, curr_avg, curr_grams)
+    views.render_buy_zones(
+        sheet_dashboard, ounce, buy_24k, sell_24k, curr_avg, curr_grams
+    )
 elif page == "🧮 الحاسبة والزكاة":
     views.render_calculator_and_zakat(buy_24k, sell_24k, curr_grams, curr_avg)
 elif page == "➕ صفقة":
