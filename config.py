@@ -48,11 +48,10 @@ ZAKAT_NISAB_GRAMS = 85.0
 ZAKAT_RATE = 0.025
 
 # ================= نماذج Gemini المتاحة (تم التحديث) =================
+# تم إزالة gemini-1.5-flash نهائياً لأنه لم يعد مدعوماً في API
 GEMINI_MODELS = [
     "gemini-2.5-flash",
     "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
 ]
 
 def build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text):
