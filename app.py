@@ -5,9 +5,7 @@ import services
 import views
 
 st.set_page_config(
-    page_title="دار السبائك AI",
-    page_icon="🪙",
-    layout="centered",
+    page_title="دار السبائك AI", page_icon="🪙", layout="centered",
     initial_sidebar_state="collapsed",
 )
 
@@ -27,6 +25,8 @@ css_style = (
     ".price-up { color: #00E676; }"
     ".price-down { color: #FF3D00; }"
     ".price-same { color: #111111; background-color: #E0E0E0; padding: 1px 6px; border-radius: 6px; }"
+    ".buy-price { color: #00E676; font-size: 0.9rem; }"
+    ".sell-price { color: #FF3D00; font-size: 0.9rem; }"
     'div[role="radiogroup"] { direction: rtl; justify-content: center; background-color: #1C1C1E !important; padding: 8px; border-radius: 14px; border: 1px solid #333333; gap: 6px; }'
     'div[role="radiogroup"] label, div[role="radiogroup"] label * { color: #FFFFFF !important; font-weight: 700 !important; }'
     ".stButton>button { width: 100%; border-radius: 12px; height: 3.1em; font-weight: 800; }"
@@ -36,13 +36,11 @@ st.markdown(css_style, unsafe_allow_html=True)
 
 sheet_dashboard, sheet_log = services.init_sheets()
 
-# ==================== مسار الـ Cron (GitHub Actions / Make.com) ====================
 if st.query_params.get("cron") == "run":
     services.generate_and_send_report(sheet_dashboard, send_notifications=True)
     st.success("CRON_OK")
     st.stop()
 
-# ==================== المصادقة ====================
 APP_PIN = st.secrets.get("APP_PIN", "1234")
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -62,8 +60,6 @@ if not st.session_state.authenticated:
             st.error("❌ الرقم السري غير صحيح")
     st.stop()
 
-
-# ==================== الشريط الحي (كل 15 ثانية) ====================
 @st.fragment(run_every=15)
 def live_sabaek_karats():
     try:
@@ -71,22 +67,18 @@ def live_sabaek_karats():
         ounce, chp = data["ounce"], data["chp"]
         buy_24k, sell_24k = data["buy_24k"], data["sell_24k"]
         k22, k21, k18 = data["k22"], data["k21"], data["k18"]
-        src_lbl = data.get("source", "SPOT XAU/USD")
+        k22_sell, k21_sell, k18_sell = data["k22_sell"], data["k21_sell"], data["k18_sell"]
+        src_lbl = data.get("source", "AlSabaek Website")
 
         st.session_state["live_ounce"] = ounce
         st.session_state["live_buy_24k"] = buy_24k
         st.session_state["live_sell_24k"] = sell_24k
 
         prev_ounce = st.session_state.get("prev_tick_ounce", ounce)
-        if ounce > prev_ounce:
-            color_cls, arrow = "price-up", "▲"
-        elif ounce < prev_ounce:
-            color_cls, arrow = "price-down", "▼"
-        else:
-            color_cls, arrow = "price-same", "•"
+        color_cls = "price-up" if ounce > prev_ounce else ("price-down" if ounce < prev_ounce else "price-same")
+        arrow = "▲" if ounce > prev_ounce else ("▼" if ounce < prev_ounce else "•")
         st.session_state["prev_tick_ounce"] = ounce
 
-        # مزامنة دورية مع Google Sheets (كل 5 دقائق) — مسح cache محدد فقط
         now_ts = time.time()
         last_sync = st.session_state.get("last_sheet_sync", 0)
         if ounce > 0 and (now_ts - last_sync) >= 300:
@@ -102,22 +94,33 @@ def live_sabaek_karats():
             f'<span style="color:#555555; font-size:0.8rem;">{src_lbl} • 15ث ⏱️</span></div>'
             '<div class="gold-ticker-box">'
             f'<div class="gold-ticker-title"><span>🪙 GOLD SPOT (XAU/USD)</span>'
-            f'<span style="color:#E6C25A;">بيع 24: {sell_24k:.3f} د.ك</span></div>'
+            f'<span style="color:#E6C25A;">د.ك</span></div>'
             f'<div class="gold-ticker-price"><span class="{color_cls}">{ounce:,.3f}</span>'
             f'<span style="font-size:0.9rem; color:#BDBDBD;"> USD </span>'
             f'<span class="{color_cls}" style="font-size:0.95rem;">{arrow} {chp:+.2f}%</span></div>'
             '</div>'
             '<div class="karats-grid">'
-            f'<div class="karat-item"><div class="karat-name">شراء ٢٤</div><div class="karat-val {color_cls}">{buy_24k:.3f} د.ك</div></div>'
-            f'<div class="karat-item"><div class="karat-name">عيار ٢٢</div><div class="karat-val {color_cls}">{k22:.3f} د.ك</div></div>'
-            f'<div class="karat-item"><div class="karat-name">عيار ٢١</div><div class="karat-val {color_cls}">{k21:.3f} د.ك</div></div>'
-            f'<div class="karat-item"><div class="karat-name">عيار ١٨</div><div class="karat-val {color_cls}">{k18:.3f} د.ك</div></div>'
+            # عيار 24
+            f'<div class="karat-item"><div class="karat-name">عيار ٢٤</div>'
+            f'<div class="karat-val buy-price">{buy_24k:.3f} د.ك</div>'
+            f'<div class="karat-val sell-price">{sell_24k:.3f} د.ك</div></div>'
+            # عيار 22
+            f'<div class="karat-item"><div class="karat-name">عيار ٢٢</div>'
+            f'<div class="karat-val buy-price">{k22:.3f} د.ك</div>'
+            f'<div class="karat-val sell-price">{k22_sell:.3f} د.ك</div></div>'
+            # عيار 21
+            f'<div class="karat-item"><div class="karat-name">عيار ٢١</div>'
+            f'<div class="karat-val buy-price">{k21:.3f} د.ك</div>'
+            f'<div class="karat-val sell-price">{k21_sell:.3f} د.ك</div></div>'
+            # عيار 18
+            f'<div class="karat-item"><div class="karat-name">عيار ١٨</div>'
+            f'<div class="karat-val buy-price">{k18:.3f} د.ك</div>'
+            f'<div class="karat-val sell-price">{k18_sell:.3f} د.ك</div></div>'
             '</div>'
         )
         st.markdown(ticker_html, unsafe_allow_html=True)
     except Exception as e:
         st.error(f"خطأ في تحديث العيارات: {e}")
-
 
 live_sabaek_karats()
 
@@ -125,87 +128,51 @@ ounce = st.session_state.get("live_ounce", 0.0)
 buy_24k = st.session_state.get("live_buy_24k", 0.0)
 sell_24k = st.session_state.get("live_sell_24k", 0.0)
 
-
-# ==================== استخراج الأرقام ====================
 def _extract_num(val_str):
-    """استخراج الرقم فقط وتجاهل أي رموز عملة (مثل $ أو د.ك)."""
     if val_str is None:
         return 0.0
-    clean_str = (
-        str(val_str)
-        .replace(",", "")
-        .replace("$", "")
-        .replace("د.ك", "")
-        .replace("ك", "")
-        .strip()
-    )
+    clean_str = str(val_str).replace(",", "").replace("$", "").replace("د.ك", "").replace("ك", "").strip()
     nums = re.findall(r"[-+]?\d*\.?\d+", clean_str)
     return float(nums[0]) if nums else 0.0
 
-
 @st.cache_data(ttl=60)
 def _get_portfolio_summary():
-    """
-    قراءة الخلايا A15:D15 بقيمها المحسوبة (UNFORMATTED) لضمان الحصول على أرقام لا صيغ.
-    الترتيب: A=رصيد الذهب، B=القيمة السوقية (د.ك)، C=القيمة السوقية ($)، D=متوسط التكلفة (د.ك)
-    """
     try:
-        row = sheet_dashboard.get(
-            "A15:D15", value_render_option="UNFORMATTED_VALUE"
-        )
+        row = sheet_dashboard.get("A15:D15", value_render_option="UNFORMATTED_VALUE")
     except Exception:
         return "0", "0", "0"
-
     vals = next(iter(row), []) if row else []
     padded = (list(vals) + ["0", "0", "0", "0"])[:4]
-    # A15 = رصيد الذهب، D15 = متوسط التكلفة، B15 = القيمة السوقية (نستخدمها كتكلفة بديلة إن لزم)
     gold_balance = padded[0]
     market_value_kwd = padded[1]
     avg_cost = padded[3]
     return str(gold_balance), str(market_value_kwd), str(avg_cost)
 
-
 gold_balance_str, total_cost_str, avg_cost_str = _get_portfolio_summary()
-
 curr_grams = _extract_num(gold_balance_str)
 curr_total_cost = _extract_num(total_cost_str)
 curr_avg = _extract_num(avg_cost_str)
 
-# حل مشكلة متوسط التكلفة إذا كان مفقوداً أو خاطئاً
 if curr_avg <= 0 and curr_grams > 0 and curr_total_cost > 0:
     curr_avg = round(curr_total_cost / curr_grams, 3)
     avg_cost_str = f"{curr_avg:.3f}"
 
-# حساب صافي الربح (على أساس سعر البيع الحالي مقابل متوسط التكلفة)
 if curr_grams > 0 and sell_24k > 0 and curr_avg > 0:
     net_pnl_kwd = round((sell_24k - curr_avg) * curr_grams, 3)
 else:
     net_pnl_kwd = 0.0
 
-
-# ==================== القائمة ====================
 page = st.radio(
     "القائمة",
-    [
-        "🏠 الرئيسية والشموع",
-        "🎯 مناطق الشراء",
-        "🧮 الحاسبة والزكاة",
-        "➕ صفقة",
-        "📜 السجل",
-    ],
-    horizontal=True,
-    label_visibility="collapsed",
+    ["🏠 الرئيسية والشموع", "🎯 مناطق الشراء", "🧮 الحاسبة والزكاة", "➕ صفقة", "📜 السجل"],
+    horizontal=True, label_visibility="collapsed",
 )
 st.write("")
 
 if page == "🏠 الرئيسية والشموع":
-    views.render_home_and_chart(
-        gold_balance_str, total_cost_str, avg_cost_str, curr_avg, net_pnl_kwd
-    )
+    views.render_home_and_chart(gold_balance_str, total_cost_str, avg_cost_str, curr_avg, net_pnl_kwd)
 elif page == "🎯 مناطق الشراء":
-    views.render_buy_zones(
-        sheet_dashboard, ounce, buy_24k, sell_24k, curr_avg, curr_grams
-    )
+    views.render_buy_zones(sheet_dashboard, ounce, buy_24k, sell_24k, curr_avg, curr_grams)
 elif page == "🧮 الحاسبة والزكاة":
     views.render_calculator_and_zakat(buy_24k, sell_24k, curr_grams, curr_avg)
 elif page == "➕ صفقة":
