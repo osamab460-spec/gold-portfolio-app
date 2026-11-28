@@ -68,7 +68,9 @@ def live_sabaek_karats():
         buy_24k, sell_24k = data["buy_24k"], data["sell_24k"]
         k22, k21, k18 = data["k22"], data["k21"], data["k18"]
         k22_sell, k21_sell, k18_sell = data["k22_sell"], data["k21_sell"], data["k18_sell"]
-        src_lbl = data.get("source", "AlSabaek Website")
+        
+        # تم تعديل السطر هنا لضمان ظهور الاسم الجديد
+        src_lbl = data.get("source", "AlSabaek Match") 
 
         st.session_state["live_ounce"] = ounce
         st.session_state["live_buy_24k"] = buy_24k
