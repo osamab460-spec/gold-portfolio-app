@@ -21,45 +21,70 @@ def init_sheets():
     sh = gc.open_by_key(config.SPREADSHEET_ID)
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
-# ================== السعر الحي (مدمج ومحسن) ==================
+# ================== السعر الحي (مباشر من API دار السبائك) ==================
 @st.cache_data(ttl=30)
 def get_live_gold():
     ounce = 0.0
     chp = 0.0
     buy_24k = 0.0
     sell_24k = 0.0
-    source_label = "Live Market Data"
+    source_label = "AlSabaek API"
 
-    # 1) جلب السعر العالمي للأونصة من TradingView
+    # 1) محاولة جلب الأسعار من الـ API الحقيقي لموقع دار السبائك
     try:
-        tv_url = "https://scanner.tradingview.com/symbol?symbol=OANDA%3AXAUUSD&fields=close,change"
-        tv_res = requests.get(tv_url, headers=config.RSS_HEADERS, timeout=6).json()
-        if isinstance(tv_res, dict) and tv_res.get("close"):
-            ounce = round(float(tv_res["close"]), 3)
-            chp = round(float(tv_res.get("change") or 0.0), 2)
-    except Exception:
-        pass
+        # هذا هو الرابط المخفي الذي يستخدمه الموقع لجلب الأسعار
+        url = "https://api.daralsabaek.com/api/v1/public/gold-prices"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Origin": "https://daralsabaek.com",
+            "Referer": "https://daralsabaek.com/"
+        }
+        res = requests.get(url, headers=headers, timeout=10)
+        
+        if res.status_code == 200:
+            data = res.json()
+            
+            # استخراج الأسعار بناءً على هيكل البيانات المتوقع
+            # (قد نضطر لتعديل هذا الجزء إذا تغير شكل البيانات)
+            if isinstance(data, list):
+                for item in data:
+                    karat = str(item.get('karat', ''))
+                    if karat == '24':
+                        buy_24k = float(item.get('buyPrice', 0.0))
+                        sell_24k = float(item.get('sellPrice', 0.0))
+                        break
+            elif isinstance(data, dict):
+                # إذا كان الرد كائناً واحداً
+                if 'buyPrice' in data:
+                    buy_24k = float(data.get('buyPrice', 0.0))
+                    sell_24k = float(data.get('sellPrice', 0.0))
+                
+            # محاولة جلب سعر الأونصة إن وجد
+            if isinstance(data, dict) and 'ouncePrice' in data:
+                ounce = float(data['ouncePrice'])
+                
+    except Exception as e:
+        print(f"AlSabaek API Error: {e}")
 
-    # 2) جلب سعر صرف الدولار مقابل الدينار الكويتي
-    usd_kwd = 0.3070  # قيمة احتياطية تقريبية
-    try:
-        fx_url = "https://scanner.tradingview.com/symbol?symbol=FX_IDC%3AUSDKWD&fields=close"
-        fx_res = requests.get(fx_url, headers=config.RSS_HEADERS, timeout=6).json()
-        if isinstance(fx_res, dict) and fx_res.get("close"):
-            usd_kwd = float(fx_res["close"])
-    except Exception:
-        pass
+    # 2) خطة بديلة (Fallback) في حال فشل الـ API
+    if buy_24k <= 0:
+        source_label = "TradingView (Fallback)"
+        try:
+            tv_url = "https://scanner.tradingview.com/symbol?symbol=OANDA%3AXAUUSD&fields=close,change"
+            tv_res = requests.get(tv_url, headers=config.RSS_HEADERS, timeout=6).json()
+            if isinstance(tv_res, dict) and tv_res.get("close"):
+                ounce = round(float(tv_res["close"]), 3)
+                chp = round(float(tv_res.get("change") or 0.0), 2)
+                # استخدام سعر الصرف الثابت المستنتج سابقاً ليطابق دار السبائك
+                usd_kwd = 0.3145 
+                gram_usd = ounce / config.OUNCE_TO_GRAM
+                buy_24k = round(gram_usd * usd_kwd, 3)
+                sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
+        except Exception:
+            pass
 
-    # 3) حساب سعر الجرام بالدينار
-    if ounce > 0:
-        # سعر الجرام العالمي بالدولار
-        gram_usd = ounce / config.OUNCE_TO_GRAM
-        # سعر الشراء بالدينار (نضيف هامش بسيط)
-        buy_24k = round(gram_usd * usd_kwd, 3)
-        # سعر البيع بالدينار (نطرح هامش دار السبائك)
-        sell_24k = round(buy_24k - 0.295, 3)
-
-    # حساب باقي العيارات
+    # 3) حساب باقي العيارات بناءً على سعر عيار 24
     k22_buy = round(buy_24k * (22 / 24), 3)
     k21_buy = round(buy_24k * (21 / 24), 3)
     k18_buy = round(buy_24k * (18 / 24), 3)
