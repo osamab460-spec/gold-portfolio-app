@@ -2,11 +2,17 @@ import os
 import pytz
 import streamlit as st
 
+
 def _get_secret(key, default=""):
+    """يقرأ القيمة من st.secrets أولاً ثم من متغيرات البيئة، مع تنظيف آمن."""
     try:
-        return str(st.secrets.get(key, default)).strip()
+        val = st.secrets.get(key, None)
+        if val is not None:
+            return str(val).strip()
     except Exception:
-        return str(os.environ.get(key, default)).strip()
+        pass
+    return str(os.environ.get(key, default)).strip()
+
 
 # ================= إعدادات Google Sheets =================
 SPREADSHEET_ID = "11s82rxEoX0TwGgzyp8LTYC2XeWJK9Jp3hk_KS14szuo"
@@ -22,7 +28,7 @@ NTFY_TOPIC = _get_secret("NTFY_TOPIC", "semsem_gold_kw_99")
 
 KUWAIT_TZ = pytz.timezone("Asia/Kuwait")
 
-# ✅ روابط RSS حقيقية ومتعددة (احتياطية)
+# ================= روابط RSS حقيقية ومتعددة (احتياطية) =================
 RSS_NEWS_URLS = [
     "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
     "https://www.investing.com/rss/news_285.rss",
@@ -30,8 +36,10 @@ RSS_NEWS_URLS = [
     "https://finance.yahoo.com/news/rssindex",
 ]
 RSS_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    )
 }
 
 # ================= معادلات التسعير (دار السبائك - الكويت) =================
@@ -49,6 +57,7 @@ GEMINI_MODELS = [
     "gemini-1.5-flash",
 ]
 
+
 def build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text):
     return (
         "أنت كبير محللي أسواق الذهب ومستشار مالي في الكويت (تطبيق دار السبائك).\n"
@@ -65,6 +74,7 @@ def build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news
         "   - الدفعة الثالثة (قاع قوي/قنص): السعر بالدولار + السعر بالكويتي + نسبة السيولة المقترحة.\n"
         "3. نصيحة لإدارة المخاطر بناءً على الأخبار القادمة."
     )
+
 
 def build_report_prompt(now_kw, ounce, ch, chp, buy_24k, portfolio_text, targets_text, news_text):
     return (
