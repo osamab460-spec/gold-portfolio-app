@@ -47,11 +47,12 @@ SELL_SPREAD_KWD = 0.295
 ZAKAT_NISAB_GRAMS = 85.0
 ZAKAT_RATE = 0.025
 
-# ================= نماذج Gemini المتاحة (تم التحديث) =================
-# تم إزالة gemini-1.5-flash نهائياً لأنه لم يعد مدعوماً في API
+# ================= نماذج Gemini المتاحة (تم التحديث للنماذج الحديثة) =================
+# تم إزالة gemini-2.0-flash و gemini-2.5-flash لأنها لم تعد مدعومة للمشاريع الجديدة
 GEMINI_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
+    "gemini-3.8-flash",       # النموذج الموصى به في رسالة الخطأ
+    "gemini-3.5-flash-lite",  # بديل سريع واقتصادي للمشاريع الجديدة
+    "gemini-3.5-flash",       # خيار إضافي مستقر
 ]
 
 def build_buy_zones_prompt(ounce, buy_24k, avg_cost, balance, tech_summary, news_text):
