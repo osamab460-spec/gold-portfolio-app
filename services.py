@@ -21,49 +21,40 @@ def init_sheets():
     sh = gc.open_by_key(config.SPREADSHEET_ID)
     return sh.worksheet(config.SHEET_DASHBOARD_NAME), sh.worksheet(config.SHEET_LOG_NAME)
 
-# ================== السعر الحي (مباشر من دار السبائك) ==================
-@st.cache_data(ttl=15)
+# ================== السعر الحي (GoldAPI + Fallback) ==================
+@st.cache_data(ttl=60) # زيادة الوقت لتقليل استهلاك API
 def get_live_gold():
     ounce = 0.0
     chp = 0.0
     buy_24k = 0.0
     sell_24k = 0.0
-    source_label = "AlSabaek Website"
+    source_label = "TradingView (Fallback)"
 
-    # 1) جلب الأسعار مباشرة من رابط الـ API الخاص بموقع دار السبائك
-    try:
-        # هذا هو الرابط الخفي الذي يستخدمه الموقع لجلب الأسعار
-        url = "https://www.alsabaek.com/api/gold-prices"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Referer": "https://www.alsabaek.com/"
-        }
-        res = requests.get(url, headers=headers, timeout=10)
-        
-        if res.status_code == 200:
-            data = res.json()
-            
-            # البحث عن أسعار عيار 24 داخل الاستجابة (الاسم قد يكون مختلفاً قليلاً)
-            # نقوم بالبحث الديناميكي عن كلمة 24 ثم سعر الشراء والبيع
-            items = data if isinstance(data, list) else data.get('data', [])
-            for item in items:
-                name = str(item.get('name', item.get('karat', '')))
-                if '24' in name:
-                    buy_24k = float(item.get('buy_price', item.get('buy', 0.0)))
-                    sell_24k = float(item.get('sell_price', item.get('sell', 0.0)))
-                    break
-                    
-            # محاولة جلب سعر الأونصة إذا كان متوفراً
-            if isinstance(data, dict) and 'ounce_price' in data:
-                ounce = float(data['ounce_price'])
-                
-    except Exception as e:
-        print(f"Scraping Error: {e}")
+    # 1) محاولة جلب السعر من GoldAPI.io
+    api_key = st.secrets.get("GOLDAPI_KEY", "")
+    if api_key:
+        try:
+            url = "https://www.goldapi.io/api/XAU/KWD"
+            headers = {
+                "x-access-token": api_key,
+                "Content-Type": "application/json"
+            }
+            res = requests.get(url, headers=headers, timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                # GoldAPI يعيد سعر الجرام بالدينار الكويتي مباشرة
+                buy_24k = round(data.get("price_gram_24k", 0.0), 3)
+                # هامش البيع (السبريد) - يمكنك تعديله ليطابق دار السبائك
+                sell_24k = round(buy_24k - 0.295, 3) 
+                ounce = round(data.get("price", 0.0), 3) # سعر الأونصة
+                source_label = "GoldAPI.io"
+            else:
+                print(f"GoldAPI Error: {res.status_code}")
+        except Exception as e:
+            print(f"GoldAPI Exception: {e}")
 
-    # 2) خطة بديلة (Fallback) في حال تعطل الموقع
-    if buy_24k <= 0 or sell_24k <= 0:
-        source_label = "TradingView (Fallback)"
+    # 2) خطة بديلة (Fallback) في حال فشل GoldAPI
+    if buy_24k <= 0:
         try:
             tv_url = "https://scanner.tradingview.com/symbol?symbol=OANDA%3AXAUUSD&fields=close,change"
             tv_res = requests.get(tv_url, headers=config.RSS_HEADERS, timeout=6).json()
@@ -72,6 +63,7 @@ def get_live_gold():
                 chp = round(float(tv_res.get("change") or 0.0), 2)
                 buy_24k = round((ounce / config.OUNCE_TO_GRAM) * config.KUWAIT_FACTOR, 3)
                 sell_24k = round(buy_24k - config.SELL_SPREAD_KWD, 3)
+                source_label = "TradingView (Fallback)"
         except Exception:
             pass
 
