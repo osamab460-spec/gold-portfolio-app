@@ -30,28 +30,33 @@ def get_live_gold():
     sell_24k = 0.0
     source_label = "AlSabaek Website"
 
-    # 1) جلب الأسعار مباشرة من موقع دار السبائك
+    # 1) جلب الأسعار مباشرة من رابط الـ API الخاص بموقع دار السبائك
     try:
-        url = "https://alsabaek.com/"
+        # هذا هو الرابط الخفي الذي يستخدمه الموقع لجلب الأسعار
+        url = "https://www.alsabaek.com/api/gold-prices"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Referer": "https://www.alsabaek.com/"
         }
-        res = requests.get(url, headers=headers, timeout=6)
+        res = requests.get(url, headers=headers, timeout=10)
         
         if res.status_code == 200:
-            # استخراج سعر الشراء والبيع لعيار 24
-            buy_match = re.search(r'عيار 24.*?سعر الشراء.*?([\d\.]+)', res.text, re.DOTALL)
-            sell_match = re.search(r'عيار 24.*?سعر البيع.*?([\d\.]+)', res.text, re.DOTALL)
+            data = res.json()
             
-            # استخراج سعر الأونصة العالمي
-            ounce_match = re.search(r'GOLD.*?([\d,]+\.\d+)', res.text)
-
-            if buy_match and sell_match:
-                buy_24k = float(buy_match.group(1))
-                sell_24k = float(sell_match.group(1))
-            
-            if ounce_match:
-                ounce = float(ounce_match.group(1).replace(',', ''))
+            # البحث عن أسعار عيار 24 داخل الاستجابة (الاسم قد يكون مختلفاً قليلاً)
+            # نقوم بالبحث الديناميكي عن كلمة 24 ثم سعر الشراء والبيع
+            items = data if isinstance(data, list) else data.get('data', [])
+            for item in items:
+                name = str(item.get('name', item.get('karat', '')))
+                if '24' in name:
+                    buy_24k = float(item.get('buy_price', item.get('buy', 0.0)))
+                    sell_24k = float(item.get('sell_price', item.get('sell', 0.0)))
+                    break
+                    
+            # محاولة جلب سعر الأونصة إذا كان متوفراً
+            if isinstance(data, dict) and 'ounce_price' in data:
+                ounce = float(data['ounce_price'])
                 
     except Exception as e:
         print(f"Scraping Error: {e}")
